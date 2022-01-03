@@ -3,7 +3,7 @@ This is a fork of https://github.com/Devuna/Devuna-KwikSourceSearch. As such, it
 
 This version has been converted from a Clarion .app to a hand code app to make it more palatable to accept pull requests (among other things). 
 
-As a result, I will no longer be maintaining the app version of my open sourced fork of KSS ( https://github.com/mriffey/Devuna-KwikSourceSearch/ ).
+As a result, I will no longer be maintaining the app version of my fork of KSS ( https://github.com/mriffey/Devuna-KwikSourceSearch/ ).
 
 With Kwik Source Search (KSS) you can perform powerful standard and regular expression searches through one or multiple text files, such as source code, log files, and debugging information.
 
