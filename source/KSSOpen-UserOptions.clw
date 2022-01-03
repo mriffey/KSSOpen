@@ -100,108 +100,122 @@ loc:PlusKeyString    CSTRING(81)                           !
 loc:PlusKeyTipString CSTRING(128)                          ! 
 loc:MinusKeyString   CSTRING(81)                           ! 
 loc:MinusKeyTipString CSTRING(128)                         ! 
-Window               WINDOW('Options'),AT(,,530,320),FONT('Segoe UI',10),DOUBLE,TILED,GRAY,HLP('UserOptions.htm'), |
-  SYSTEM
-                       PANEL,AT(5,5,520,310),USE(?Panel1),BEVEL(1)
-                       PROMPT('S&end to Command'),AT(10,10),USE(?thisEditCommand:Prompt)
-                       COMBO(@s255),AT(80,10,328,10),USE(thisEditCommand),VSCROLL,ALRT(DeleteKey),ALRT(MouseRight), |
-  DROP(10),FORMAT('1020L(2)|M@s255@'),FROM(EditorQueue)
-                       BUTTON('...'),AT(413,10,11,10),USE(?LookupSendToCommand)
-                       CHECK(' &Prompt for Command'),AT(428,10,92),USE(glo:PromptForEditor)
-                       PROMPT('Clarion &Help File'),AT(10,25),USE(?loc:szClarionHelpFile:Prompt)
-                       ENTRY(@s255),AT(80,25,422,10),USE(loc:szClarionHelpFile),COLOR(COLOR:BTNFACE),READONLY,SKIP
-                       BUTTON('...'),AT(505,24,11,10),USE(?LookupFile)
-                       CHECK(' Identify &Location in all files'),AT(17,49,137),USE(glo:bAllExtensions)
-                       GROUP('Identify Location in these File Extensions'),AT(10,39,150,271),USE(?ClarionExtensions:Group), |
-  BOXED
-                         LIST,AT(17,62,136,225),USE(?List),CENTER,VSCROLL,ALRT(MouseLeft2),FORMAT('80L(2)|M@s20@'), |
-  FROM(ClarionExtensionsQueue),TIP('Filenames containing the extensions in this list wi' & |
-  'll receive Location Identification processing.  This special processing may incur si' & |
-  'gnificant processing overhead.')
-                         BUTTON('Insert'),AT(17,292,40,12),USE(?Insert),KEY(InsertKey)
-                         BUTTON('Edit'),AT(59,292,40,12),USE(?Change),KEY(CtrlEnter)
-                         BUTTON('Delete'),AT(102,292,40,12),USE(?Delete),KEY(DeleteKey)
-                       END
-                       GROUP('Properties'),AT(165,39,355,271),USE(?EditorStylesGroup),BOXED
-                         LIST,AT(170,62,102,225),USE(?lbPropertyFiles),ALRT(MouseLeft2),FORMAT('125L(2)Y@s255@'),FROM(PropertyFileQueue)
-                         BUTTON('Edit'),AT(188,292,40,12),USE(?cmdPropertyEditor),TIP('Edit the highlighted prop' & |
-  'erty file.')
-                         PROMPT('&Confirm deletions'),AT(282,48,60,10),USE(?DeleteWarningThresholdPrompt),TRN
-                         LIST,AT(357,48,38,10),USE(loc:nDeleteWarningCount),DROP(3),FROM('Never|#0|Always|#1|When|#2')
-                         STRING('removing at least'),AT(398,48,,10),USE(?RemovingAtLeast),HIDE
-                         SPIN(@N10~ rows~),AT(460,48,55,10),USE(loc:nDeleteWarningCount,,?loc:nDeleteWarningCount:2), |
-  RIGHT(2),HIDE,RANGE(2,9999),TIP('Show a warning message when the number of records to' & |
-  ' be deleted  is greater than or equal to this number.<0DH,0AH>Leave blank to complet' & |
-  'ely disable the warning message.')
-                         BOX,AT(282,62,11,10),USE(?loc:sResultListColorBox),COLOR(00B99D7Fh),FILL(COLOR:Black),LINEWIDTH(1), |
-  ROUND
-                         PROMPT('&Result List'),AT(297,62),USE(?Font:Prompt),TRN
-                         ENTRY(@s63),AT(357,62,145,10),USE(szFontDescription),DISABLE
-                         BUTTON('...'),AT(505,62,11,10),USE(?cmdFontDialog)
-                         BOX,AT(282,77,11,10),USE(?loc:sApplicationColorBox),COLOR(00B99D7Fh),FILL(00EAD1B9h),LINEWIDTH(1), |
-  ROUND
-                         PROMPT('&Application'),AT(297,77),USE(?loc:ApplicationColor:Prompt),TRN
-                         ENTRY(@s30),AT(357,77,145,10),USE(loc:sApplicationColor),LEFT,COLOR(COLOR:White),DISABLE,SKIP
-                         BUTTON('...'),AT(505,77,11,10),USE(?ApplicationColorButton),TIP('Select Application Color')
-                         BOX,AT(282,92,11,10),USE(?loc:sToolbarColorBox),COLOR(00B99D7Fh),FILL(00F2E4D7h),LINEWIDTH(1), |
-  ROUND
-                         PROMPT('&Toolbar'),AT(297,92),USE(?loc:ToolbarColor:Prompt),TRN
-                         ENTRY(@s30),AT(357,92,145,10),USE(loc:sToolbarColor),LEFT,COLOR(COLOR:White),DISABLE,SKIP
-                         BUTTON('...'),AT(505,92,11,10),USE(?ToolbarColorButton),TIP('Select Toolbar Color')
-                         BOX,AT(282,107,11,10),USE(?loc:sSelectedBackColorBox),COLOR(00B99D7Fh),FILL(COLOR:Red),LINEWIDTH(1), |
-  ROUND
-                         PROMPT('&Selected'),AT(297,107),USE(?loc:SelectedBackColor:Prompt),TRN
-                         ENTRY(@s30),AT(357,107,145,10),USE(loc:sSelectedBackColor),LEFT,COLOR(COLOR:White),DISABLE, |
-  SKIP
-                         BUTTON('...'),AT(505,107,11,10),USE(?SelectedBackColorButton),TIP('Select Selected Text' & |
-  ' Background Color')
-                         BOX,AT(282,122,11,10),USE(?loc:sBookmarkBackColorBox),COLOR(00B99D7Fh),FILL(COLOR:Maroon), |
-  LINEWIDTH(1),ROUND
-                         PROMPT('Boo&kmark'),AT(297,122),USE(?loc:BookmarkBackColor:Prompt),TRN
-                         ENTRY(@s30),AT(357,122,145,10),USE(loc:sBookmarkBackColor),LEFT,COLOR(COLOR:White),DISABLE, |
-  SKIP
-                         BUTTON('...'),AT(505,122,11,10),USE(?BookmarkBackColorButton),TIP('Select Bookmark Back' & |
-  'ground Color')
-                         BUTTON,AT(170,292,14,12),USE(?cmdDefault),ICON('check-black.ico'),TIP('Set the default ' & |
-  'property file')
-                         BUTTON('Delete'),AT(232,292,40,12),USE(?cmdDeletePropertyFile),TIP('Delete the highligh' & |
-  'ted property file.')
-                         BUTTON('Official Devuna Github'),AT(282,292,,12),USE(?btnGetSource),FONT(,,,FONT:regular)
-                         BUTTON('Github - This Fork'),AT(386,292,,12),USE(?btnGithubThisFork)
-                       END
-                       CHECK(' &Link Paths and Files with Find Text'),AT(282,137),USE(glo:SyncPathWithPattern),TIP('Recall Pat' & |
-  'hs and Files when you select prior Find text from the drop list.')
-                       CHECK(' Allow &Multiple Instances'),AT(282,147),USE(glo:AllowMultipleInstances)
-                       CHECK(' Auto Size Result &Columns'),AT(407,147),USE(glo:AutoSizeResultColumns)
-                       PROMPT('Restore &Point Timer'),AT(282,171),USE(?glo:RestorePointTimerInterval:Prompt)
-                       SPIN(@n13),AT(358,171,60,10),USE(glo:RestorePointTimerInterval),RIGHT(1),STEP(1),TIP('Set to 0 t' & |
-  'o disable Restore Point Feature')
-                       STRING('minutes'),AT(423,171),USE(?Minutes:String)
-                       GROUP('Application Function Keys'),AT(282,182,234,38),USE(?FunctionKeyBox),BOXED,TRN
-                         STRING(@s80),AT(286,192,215,10),USE(loc:MinusKeyString),RIGHT,TRN
-                         REGION,AT(286,192,215,10),USE(?loc:MinusKeyStringRegion),IMM
-                         BUTTON('...'),AT(503,192,11,10),USE(?cmdGetMinusKey)
-                         STRING(@s80),AT(286,204,215,10),USE(loc:PlusKeyString),RIGHT,TRN
-                         REGION,AT(286,204,215,10),USE(?loc:PlusKeyStringRegion),IMM
-                         BUTTON('...'),AT(503,204,11,10),USE(?cmdGetPlusKey)
-                       END
-                       GROUP,AT(282,220,234,68),USE(?CopyrightBox),BOXED,TRN
-                         STRING('Kwik Source Search - Open Source Edition'),AT(314,226,171),USE(?ProductName),FONT(, |
-  ,,FONT:bold),CENTER,TRN
-                         STRING(@s31),AT(336,234,127),USE(glo:szVersion),CENTER,TRN
-                         STRING('© Copyright  2011-2017'),AT(336,242,127),USE(?Copyright),CENTER,TRN
-                         STRING('Devuna Inc.'),AT(336,251,127),USE(?CompanyName),CENTER,TRN
-                         REGION,AT(359,260,90,10),USE(?rgnWebAddress),IMM
-                         STRING('http://www.devuna.com'),AT(336,260,127),USE(?strWebAddress),FONT(,10,COLOR:Blue,FONT:regular), |
-  CENTER,TRN
-                         STRING(''),AT(329,269,141),USE(?strRegisteredTo),CENTER,HIDE,TRN
-                         STRING('Devuna Inc.'),AT(336,251,127,10),USE(?CompanyName:2),CENTER,TRN
-                       END
-                       BUTTON('&Apply'),AT(476,292,40,12),USE(?cmdApply)
-                       BUTTON('Cancel'),AT(276,251),USE(?Cancel),HIDE
-                       CHECK(' Include files with binary content'),AT(282,158,142,10),USE(glo:DisableSlashP),TIP('Disable /p' & |
-  ' in FINDSTR'),VALUE('1','0')
-                     END
+Window WINDOW('Options'),AT(,,530,320),GRAY,SYSTEM,HLP('UserOptions.htm'), |
+      FONT('Segoe UI',10),Tiled,DOUBLE
+    PANEL,AT(5,5,520,310),USE(?Panel1),BEVEL(1)
+    PROMPT('S&end to Command'),AT(10,10),USE(?thisEditCommand:Prompt)
+    COMBO(@s255),AT(80,10,328,10),USE(thisEditCommand),VSCROLL,DROP(10), |
+        FROM(EditorQueue),ALRT(DeleteKey), ALRT(MouseRight),FORMAT('1020L(2)|M@s255@')
+    BUTTON('...'),AT(413,10,11,10),USE(?LookupSendToCommand)
+    CHECK(' &Prompt for Command'),AT(428,10,92),USE(glo:PromptForEditor)
+    PROMPT('Clarion &Help File'),AT(10,25),USE(?loc:szClarionHelpFile:Prompt)
+    ENTRY(@s255),AT(80,25,422,10),USE(loc:szClarionHelpFile),SKIP,COLOR(COLOR:BTNFACE), |
+        READONLY
+    BUTTON('...'),AT(505,24,11,10),USE(?LookupFile)
+    CHECK(' Identify &Location in all files'),AT(17,49,137),USE(glo:bAllExtensions)
+    GROUP('Identify Location in these File Extensions'),AT(10,39,150,271), |
+        USE(?ClarionExtensions:Group),BOXED
+      LIST,AT(17,62,136,225),USE(?List),VSCROLL,CENTER,TIP('Filenames containing' & |
+          ' the extensions in this list will receive Location Identification pro' & |
+          'cessing.  This special processing may incur significant processing ov' & |
+          'erhead.'),FROM(ClarionExtensionsQueue),FORMAT('80L(2)|M@s20@'), |
+          ALRT(MouseLeft2)
+      BUTTON('Insert'),AT(17,292,40,12),USE(?Insert),KEY(InsertKey)
+      BUTTON('Edit'),AT(59,292,40,12),USE(?Change),KEY(CtrlEnter)
+      BUTTON('Delete'),AT(102,292,40,12),USE(?Delete),KEY(DeleteKey)
+    END
+    GROUP('Properties'),AT(165,39,355,271),USE(?EditorStylesGroup),BOXED
+      LIST,AT(170,62,102,225),USE(?lbPropertyFiles),FROM(PropertyFileQueue), |
+          FORMAT('125L(2)Y@s255@'),ALRT(MouseLeft2)
+      BUTTON('Edit'),AT(188,292,40,12),USE(?cmdPropertyEditor),TIP('Edit the hig' & |
+          'hlighted property file.')
+      PROMPT('&Confirm deletions'),AT(282,48,60,10),USE(?DeleteWarningThresholdPrompt), |
+          TRN
+      LIST,AT(357,48,38,10),USE(loc:nDeleteWarningCount),DROP(3),FROM('Never|#0|' & |
+          'Always|#1|When|#2')
+      STRING('removing at least'),AT(398,48,,10),USE(?RemovingAtLeast),HIDE
+      SPIN(@N10~ rows~),AT(460,48,55,10),USE(loc:nDeleteWarningCount,, |
+           ?loc:nDeleteWarningCount:2),HIDE,RIGHT(2),TIP('Show a warning message' & |
+          ' when the number of records to be deleted  is greater than or equal t' & |
+          'o this number.<0DH,0AH>Leave blank to completely disable the warning ' & |
+          'message.'),RANGE(2,9999)
+      BOX,AT(282,62,11,10),USE(?loc:sResultListColorBox),COLOR(0B99D7FH), |
+          FILL(COLOR:Black),ROUND,LINEWIDTH(1)
+      PROMPT('&Result List'),AT(297,62),USE(?Font:Prompt),TRN
+      ENTRY(@s63),AT(357,62,145,10),USE(szFontDescription),DISABLE
+      BUTTON('...'),AT(505,62,11,10),USE(?cmdFontDialog)
+      BOX,AT(282,77,11,10),USE(?loc:sApplicationColorBox),COLOR(0B99D7FH), |
+          FILL(0EAD1B9H),ROUND,LINEWIDTH(1)
+      PROMPT('&Application'),AT(297,77),USE(?loc:ApplicationColor:Prompt),TRN
+      ENTRY(@s30),AT(357,77,145,10),USE(loc:sApplicationColor),SKIP,DISABLE,LEFT, |
+          COLOR(COLOR:White)
+      BUTTON('...'),AT(505,77,11,10),USE(?ApplicationColorButton),TIP('Select Ap' & |
+          'plication Color')
+      BOX,AT(282,92,11,10),USE(?loc:sToolbarColorBox),COLOR(0B99D7FH),FILL(0F2E4D7H), |
+          ROUND,LINEWIDTH(1)
+      PROMPT('&Toolbar'),AT(297,92),USE(?loc:ToolbarColor:Prompt),TRN
+      ENTRY(@s30),AT(357,92,145,10),USE(loc:sToolbarColor),SKIP,DISABLE,LEFT, |
+          COLOR(COLOR:White)
+      BUTTON('...'),AT(505,92,11,10),USE(?ToolbarColorButton),TIP('Select Toolba' & |
+          'r Color')
+      BOX,AT(282,107,11,10),USE(?loc:sSelectedBackColorBox),COLOR(0B99D7FH), |
+          FILL(COLOR:Red),ROUND,LINEWIDTH(1)
+      PROMPT('&Selected'),AT(297,107),USE(?loc:SelectedBackColor:Prompt),TRN
+      ENTRY(@s30),AT(357,107,145,10),USE(loc:sSelectedBackColor),SKIP,DISABLE,LEFT, |
+          COLOR(COLOR:White)
+      BUTTON('...'),AT(505,107,11,10),USE(?SelectedBackColorButton),TIP('Select ' & |
+          'Selected Text Background Color')
+      BOX,AT(282,122,11,10),USE(?loc:sBookmarkBackColorBox),COLOR(0B99D7FH), |
+          FILL(COLOR:Maroon),ROUND,LINEWIDTH(1)
+      PROMPT('Boo&kmark'),AT(297,122),USE(?loc:BookmarkBackColor:Prompt),TRN
+      ENTRY(@s30),AT(357,122,145,10),USE(loc:sBookmarkBackColor),SKIP,DISABLE,LEFT, |
+          COLOR(COLOR:White)
+      BUTTON('...'),AT(505,122,11,10),USE(?BookmarkBackColorButton),TIP('Select ' & |
+          'Bookmark Background Color')
+      BUTTON,AT(170,292,14,12),USE(?cmdDefault),ICON('check-black.ico'), |
+          TIP('Set the default property file')
+      BUTTON('Delete'),AT(232,292,40,12),USE(?cmdDeletePropertyFile),TIP('Delete' & |
+          ' the highlighted property file.')
+      BUTTON('Official Devuna Github'),AT(282,292,,12),USE(?btnGetSource), |
+          FONT(,,,FONT:regular)
+      BUTTON('Github - This Fork'),AT(386,292,,12),USE(?btnGithubThisFork)
+    END
+    CHECK(' &Link Paths and Files with Find Text'),AT(282,137),USE(glo:SyncPathWithPattern) |
+        ,TIP('Recall Paths and Files when you select prior Find text from the dr' & |
+        'op list.')
+    CHECK(' Allow &Multiple Instances'),AT(282,147),USE(glo:AllowMultipleInstances)
+    CHECK(' Auto Size Result &Columns'),AT(407,147),USE(glo:AutoSizeResultColumns)
+    PROMPT('Restore &Point Timer'),AT(282,171),USE(?glo:RestorePointTimerInterval:Prompt) |
+        
+    SPIN(@n13),AT(358,171,60,10),USE(glo:RestorePointTimerInterval),RIGHT(1), |
+        TIP('Set to 0 to disable Restore Point Feature'),STEP(1)
+    STRING('minutes'),AT(423,171),USE(?Minutes:String)
+    GROUP('Application Function Keys'),AT(282,182,234,38),USE(?FunctionKeyBox),BOXED, |
+        TRN
+      STRING(@s80),AT(286,192,215,10),USE(loc:MinusKeyString),TRN,RIGHT
+      REGION,AT(286,192,215,10),USE(?loc:MinusKeyStringRegion),IMM
+      BUTTON('...'),AT(503,192,11,10),USE(?cmdGetMinusKey)
+      STRING(@s80),AT(286,204,215,10),USE(loc:PlusKeyString),TRN,RIGHT
+      REGION,AT(286,204,215,10),USE(?loc:PlusKeyStringRegion),IMM
+      BUTTON('...'),AT(503,204,11,10),USE(?cmdGetPlusKey)
+    END
+    GROUP,AT(282,220,234,68),USE(?CopyrightBox),BOXED,TRN
+      STRING('Kwik Source Search - Hand Code Open Source Edition'),AT(290,226,213), |
+          USE(?ProductName),TRN,CENTER,FONT(,,,FONT:bold)
+      STRING(@s31),AT(336,234,127),USE(glo:szVersion),TRN,CENTER
+      STRING('© Copyright  2011-2017'),AT(336,242,127),USE(?Copyright),TRN,CENTER
+      STRING('Devuna Inc.'),AT(336,251,127),USE(?CompanyName),TRN,CENTER
+      REGION,AT(359,260,90,10),USE(?rgnWebAddress),IMM
+      STRING('http://www.devuna.com'),AT(336,260,127),USE(?strWebAddress),TRN,CENTER, |
+          FONT(,10,COLOR:Blue,FONT:regular)
+      STRING(''),AT(329,269,141),USE(?strRegisteredTo),TRN,HIDE,CENTER
+      STRING('Devuna Inc.'),AT(336,251,127,10),USE(?CompanyName:2),TRN,CENTER
+    END
+    BUTTON('&Apply'),AT(476,292,40,12),USE(?cmdApply)
+    BUTTON('Cancel'),AT(276,251),USE(?Cancel),HIDE
+    CHECK(' Include files with binary content'),AT(282,158,142,10),USE(glo:DisableSlashP) |
+        ,VALUE('1','0'),TIP('Disable /p in FINDSTR')
+  END
 
 QEIP1:SaveEntry      GROUP,PRE(QEIP1)
 FileExtension          LIKE(CEQ:FileExtension)

@@ -564,7 +564,7 @@ DebugABCGlobalVariables_kss PROCEDURE()                                         
 !PowerShell
 !Batch
 !VBScript   - done
-glo:szVersion        CSTRING('2017.08.05.0<0>{19}')
+glo:szVersion        CSTRING(' ')!('2017.08.05.0<0>{19}')
 glo:DisableSlashP    LONG
 glo:szNewVersion     CSTRING(32)
 glo:szNoDownloadVersion CSTRING(32)
