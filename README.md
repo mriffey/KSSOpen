@@ -24,7 +24,7 @@ Get installers here: https://github.com/mriffey/KSSOpen/releases
 
 **DEPENDENCIES**
 
-Without the list of tools below, you will not be able to build this source. You can remove the references to xFiles and StringTheory. Anyone with a basic level of experience with Clarion will likely be able to do this. Note that Winevent was removed - which means the exe will prevent a reboot / shutdown until code is added to do this without WinEvent. 
+Without the list of tools below, you will not be able to build this source. You can remove the references to xFiles and StringTheory. Anyone with a basic level of experience with Clarion will likely be able to do this. Note that the dependency on Capesoft WinEvent was removed - which means the exe will prevent a reboot / shutdown until code is added to do this without WinEvent. 
 
 Required tools / code:
 
