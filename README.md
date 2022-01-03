@@ -32,6 +32,7 @@ Required tools / code:
 - Clarion 10 or later (installer version is based on Clarion 11) 
 - Capesoft xFiles
 - Capesoft StringTheory
+- Several of Mark Goldberg's classes from https://github.com/markgoldberg
 
 
 **OPEN SOURCE RELEASE NOTES AND NEWS**
