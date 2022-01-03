@@ -1,5 +1,5 @@
 # KSSOpen Hand-code edition # 
-This is a fork of # Devuna-KwikSourceSearch #. As such, it is a derived work of Devuna's work and the associated MIT license stays with it.
+This is a fork of https://github.com/Devuna/Devuna-KwikSourceSearch. As such, it is a derived work of Devuna's work and the associated MIT license stays with it.
 
 With Kwik Source Search (KSS) you can perform powerful standard and regular expression searches through one or multiple text files, such as source code, log files, and debugging information.
 
