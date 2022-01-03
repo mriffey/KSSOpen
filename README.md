@@ -1,5 +1,9 @@
-# KSSOpen Hand-code edition # 
+# KSSOpen hand code edition # 
 This is a fork of https://github.com/Devuna/Devuna-KwikSourceSearch. As such, it is a derived work of Devuna's work and the associated MIT license stays with it.
+
+This version has been converted from a Clarion .app to a hand code app to make it more palatable to accept pull requests (among other things). 
+
+As a result, I will no longer be maintaining the app version of my open sourced fork of KSS ( https://github.com/mriffey/Devuna-KwikSourceSearch/ ).
 
 With Kwik Source Search (KSS) you can perform powerful standard and regular expression searches through one or multiple text files, such as source code, log files, and debugging information.
 
@@ -14,7 +18,7 @@ This version of KSS is slightly different from the last commercial release.
 
 Most notably the Results List 'Print' and the 'CheckForUpdate' features have been removed as they required other 3rd party tools, some of which are no longer available.
 
-**KSSOpen readme begins (content above came from Randy)**
+**KSSOpen readme begins here (the content above came from Randy/Devuna)**
 
 Get installers here: https://github.com/mriffey/KSSOpen/releases
 
