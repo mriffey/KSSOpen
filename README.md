@@ -34,6 +34,8 @@ Required tools / code:
 - Capesoft StringTheory
 - Several of Mark Goldberg's classes from https://github.com/markgoldberg
 
+**WARNING** This repo uses Git LFS. See https://git-lfs.github.com/ for details.
+
 
 **OPEN SOURCE RELEASE NOTES AND NEWS**
 
