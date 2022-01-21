@@ -2050,7 +2050,7 @@ MONITOR_DEFAULTTOPRIMARY   EQUATE(00000001h)
   tCompileTime = 7296044
    strBuildNumber = '2022.1.' & 97 + 1  ! because link comes after generate, so the # will be 1 higher. 
   strBuildDate = Left(Clip(Format(80724,@d17))) & ' - ' & Left(Clip(Format(7296044,@t04)))
-   glo:szVersion = strBuildNumber !mr 20180819
+  !glo:szVersion = strBuildNumber !mr 20180819  ! 2022-01-21, no longer needed. VersionMe takes care of this. 
   ReturnValue = PARENT.Init()
   IF ReturnValue THEN RETURN ReturnValue.
   SELF.FirstField = ?sciControl:Region

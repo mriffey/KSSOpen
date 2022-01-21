@@ -1,0 +1,1 @@
+glo:szVersion        CSTRING('$VERSIONME')

@@ -173,6 +173,9 @@
     <Compile Include="KSSOpen-RestorePointTimer.clw">
       <Generated>true</Generated>
     </Compile>
+    <None Include="KSSOpen_VersionMe.xml" />
+    <None Include="VersionMeTemplate.clw" />
+    <None Include="VersionMe.clw" />
     <None Include="KSSOpen.EXE.manifest" />
     <None Include="KSSOpen.Version" />
     <None Include="zlibwapi.dll">

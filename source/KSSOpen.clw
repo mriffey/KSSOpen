@@ -402,7 +402,6 @@ FOF_WANTNUKEWARNING        EQUATE(04000h)  ! during delete operation, warn if nu
 FOF_NORECURSEREPARSE       EQUATE(08000h)  ! deprecated; the operations engine always does the right thing on FolderLink objects (symlinks, reparse points, folder shortcuts)
 FOF_NO_UI                  EQUATE(00614h)  !(FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR) ! don't display any UI at all
 CtrlShiftBar   EQUATE(988)
-WinEvent:TemplateVersion      equate('5.28')
 
    INCLUDE('ABERROR.INC'),ONCE
    INCLUDE('ABUTIL.INC'),ONCE
@@ -564,7 +563,10 @@ DebugABCGlobalVariables_kss PROCEDURE()                                         
 !PowerShell
 !Batch
 !VBScript   - done
-glo:szVersion        CSTRING(' ')!('2017.08.05.0<0>{19}')
+!
+ INCLUDE('VersionMe.clw'),ONCE  ! Used by VersionMe.exe to inject a version # into the code for screens/reports 
+! 
+!glo:szVersion        CSTRING('')!('2017.08.05.0<0>{19}')
 glo:DisableSlashP    LONG
 glo:szNewVersion     CSTRING(32)
 glo:szNoDownloadVersion CSTRING(32)
