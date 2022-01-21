@@ -45,5 +45,6 @@ KSSO does not require registration.
 
 To purchase KSS, see Devuna.com (purchasing may no longer be available). NOTE: I AM NOT DEVUNA. 
 
-**2.0.0  2022-01-02** Initial hand code edition 
+**2022.1.21.24 2022-01-21** Initial hand code edition, with installer and auto-versioning (date.build).
+**2.0.0  2022-01-02** Initial hand code edition - note, this is the old versioning scheme. 
 
