@@ -77,8 +77,6 @@ saveColWidth   LONG     !saved Location column width
 oST StringTheory 
 
 
-!dCompileDate   LONG
-!tCompileTime   LONG 
 oHH           &tagHTMLHelp
 baseFontName            CSTRING('Verdana')
 baseFontSize            BYTE(10)
@@ -216,8 +214,6 @@ szSendToFilename        CSTRING(MAX_PATH)
 bMatchPatternStartOfLine BOOL                              ! 
 strBuildDate         STRING(21)                            ! 
 strBuildNumber       STRING(20)                            ! 
-dCompileDate         LONG                                  ! 
-tCompileTime         LONG                                  ! 
 bMatchPatternEndOfLine BOOL                                ! 
 bUseRegularExpressions BOOL                                ! 
 bSearchSubdirectories BOOL                                 ! 
@@ -2042,15 +2038,7 @@ MONITOR_DEFAULTTOPRIMARY   EQUATE(00000001h)
      I = J+1
      J = LEN(CLIP(loc:szViewerStyle))
      glo:ViewerStyles.StyleGroup[K].HotSpot = loc:szViewerStyle[I : J]
-  END
-  dCompileDate = 80724
-  tCompileTime = 7296044
-  strBuildDate = Left(Clip(Format(80724,@d10))) & ' - ' & Left(Clip(Format(7296044,@t04)))
-  dCompileDate = 80724
-  tCompileTime = 7296044
-   strBuildNumber = '2022.1.' & 97 + 1  ! because link comes after generate, so the # will be 1 higher. 
-  strBuildDate = Left(Clip(Format(80724,@d17))) & ' - ' & Left(Clip(Format(7296044,@t04)))
-  !glo:szVersion = strBuildNumber !mr 20180819  ! 2022-01-21, no longer needed. VersionMe takes care of this. 
+  END  
   ReturnValue = PARENT.Init()
   IF ReturnValue THEN RETURN ReturnValue.
   SELF.FirstField = ?sciControl:Region
