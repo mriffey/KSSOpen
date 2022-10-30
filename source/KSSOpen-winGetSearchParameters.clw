@@ -71,70 +71,80 @@ BUTTON:LOAD             EQUATE(1)
 BUTTON:SEARCH           EQUATE(2)
 BUTTON:SEARCHNEW        EQUATE(3)
 !bFilenamesOnly       BOOL
-Window               WINDOW('Search for...'),AT(,,320,170),FONT('Segoe UI',10),RESIZE,GRAY,HLP('SearchFor.htm'), |
-  SYSTEM
-                       PROMPT('&File'),AT(5,5),USE(?szSearchStringFilename:Prompt),HIDE,TRN
-                       ENTRY(@S255),AT(35,5,262,10),USE(SearchOptions.szSearchStringFilename,,?szSearchStringFilename), |
-  HIDE
-                       BUTTON('...'),AT(170,5,14,10),USE(?cmdLookupSearchStringFilename),HIDE,TIP('Lookup Sear' & |
-  'ch String Filename')
-                       PROMPT('Fi&nd'),AT(5,5),USE(?szPattern:Prompt),TRN
-                       COMBO(@s255),AT(35,5,262,10),USE(SearchOptions.szPattern,,?szPattern),VSCROLL,ALRT(MouseRight), |
-  COLOR(COLOR:White),DROP(10),FORMAT('80L(2)|MS(1024)@s255@'),FROM(PatternQueue),TIP('Specified ' & |
-  'text to be searched for.')
-                       CHECK(' &Get Find Text from Specified File'),AT(35,17),USE(SearchOptions.bSearchStringsFromFile, |
-  ,?bSearchStringsFromFile),TIP('Get search strings from the specified file')
-                       CHECK(' &Case Sensitive'),AT(35,35),USE(SearchOptions.bCaseSensitive,,?bCaseSensitive),TIP('Specifies ' & |
-  'that the search is to be case-sensitive.'),TRN
-                       CHECK(' Exclude Commen&t Lines'),AT(170,35),USE(SearchOptions.bExcludeComments,,?bExcludeComments), |
-  TIP('Prints only lines that do not contain a match inside a comment.'),TRN
-                       CHECK(' Matc&h Pattern at Start of Line'),AT(35,45),USE(SearchOptions.bMatchPatternStartOfLine, |
-  ,?bMatchPatternStartOfLine),TIP('Matches the pattern if at the beginning of a line.'),TRN
-                       CHECK(' Match Pattern at &End of Line'),AT(170,45),USE(SearchOptions.bMatchPatternEndOfLine, |
-  ,?bMatchPatternEndOfLine),TIP('Matches the pattern if at the end of a line.'),TRN
-                       CHECK(' Exact &Match'),AT(35,55),USE(SearchOptions.bExactMatch,,?bExactMatch),TIP('Finds line' & |
-  's that match exactly.'),TRN
-                       CHECK(' E&xclude Matching Lines'),AT(170,55),USE(SearchOptions.bExcludeMatch,,?bExcludeMatch), |
-  TIP('Prints only lines that do not contain a match.'),TRN
-                       CHECK(' Use &Regular Expressions'),AT(35,65),USE(SearchOptions.bUseRegularExpressions,,?bUseRegularExpressions), |
-  TIP('Uses Find strings as regular expressions.'),TRN
-                       BUTTON,AT(143,65,12,10),USE(?cmdRegExHelp),ICON('help.ico'),FLAT
-                       CHECK(' Filenames &Only'),AT(170,65),USE(SearchOptions.bFilenamesOnly,,?bFilenamesOnly),TIP('Prints onl' & |
-  'y the names of files that do contain a match.'),TRN
-                       CHECK(' Re&ad File List from Specified File'),AT(35,80),USE(SearchOptions.bFileListFromFile, |
-  ,?bFileListFromFile),TIP('Get the list of files to search from the specified file'),TRN
-                       PROMPT('F&ile'),AT(5,92),USE(?szFileListFilename:Prompt),HIDE,TRN
-                       ENTRY(@S255),AT(35,92,262,10),USE(SearchOptions.szFileListFilename,,?szFileListFilename),HIDE
-                       BUTTON('...'),AT(301,92,14,10),USE(?cmdLookupFileListFilename),HIDE,TIP('Lookup File Li' & |
-  'st Filename')
-                       PROMPT('&Paths'),AT(5,92),USE(?szSearchPath:Prompt),TRN
-                       COMBO(@S255),AT(35,92,245,10),USE(SearchOptions.szSearchPath,,?szSearchPath),VSCROLL,ALRT(MouseRight), |
-  COLOR(COLOR:White),DROP(10),FORMAT('80L(2)|MS(1024)@s255@'),FROM(SearchPathQueue),MSG('Search Path'), |
-  TIP('Search Path Starting Folder')
-                       BUTTON('...'),AT(284,92,14,10),USE(?cmdSelectFolder),TIP('Select New Search Path')
-                       BUTTON('+'),AT(301,92,14,10),USE(?cmdAddFolder),TIP('Append to Existing Search Path')
-                       CHECK(' Search S&ubdirectories'),AT(35,107),USE(SearchOptions.bSearchSubdirectories,,?bSearchSubdirectories), |
-  TIP('Searches for matching files in the current directory and all subdirectories.'),TRN
-                       PROMPT('Le&vels:'),AT(139,107),USE(?nLevels:Prompt),TRN
-                       SPIN(@n3b),AT(165,107,25,10),USE(SearchOptions.nLevels,,?nLevels),RIGHT,COLOR(COLOR:White), |
-  MSG('Subdirectory Levels to Search'),RANGE(0,255),TIP('Specify the number of subdirec' & |
-  'tory levels to search.  If this value is blank then all subdirectories will be searched.')
-                       PROMPT('&Files'),AT(5,122),USE(?szFileMask:Prompt),TRN
-                       COMBO(@s255),AT(35,122,280,10),USE(SearchOptions.szFileMask,,?szFileMask),VSCROLL,ALRT(MouseRight), |
-  COLOR(COLOR:White),DROP(10),FORMAT('80L(2)|MS(1024)@s255@'),FROM(FileMaskQueue),TIP('Specifies ' & |
-  'a file or files to search.<0DH,0AH>The elements in the string may be delimited by ve' & |
-  'rtical bars (|) ,  semicolons (;), or spaces.')
-                       PROMPT('E&xclude'),AT(5,137),USE(?szExcludeMask:Prompt),TRN
-                       COMBO(@s255),AT(35,137,280,10),USE(SearchOptions.szExcludeMask,,?szExcludeMask),VSCROLL,ALRT(MouseRight), |
-  COLOR(COLOR:White),DROP(10),FORMAT('80L(2)|MS(1024)@s255@'),FROM(ExcludeMaskQueue),TIP('Specifies ' & |
-  'a file or files to be excluded from the search.<0DH,0AH>The elements in the string m' & |
-  'ay be delimited by vertical bars (|) ,  semicolons (;), or spaces.')
-                       BUTTON('&Load Saved Results'),AT(35,152,70,14),USE(?cmdLoadSavedResults)
-                       BUTTON('&Search'),AT(140,152,70,14),USE(?cmdSearch),DEFAULT
-                       BUTTON('Search Ne&w Tab'),AT(245,152,70,14),USE(?cmdSearchNew)
-                       CHECK(' Include files with binary content'),AT(170,80),USE(glo:DisableSlashP),TIP('Disables /' & |
-  'P in FINDSTR.'),VALUE('1','0')
-                     END
+Window WINDOW('Search for...'),AT(,,320,170),GRAY,SYSTEM,HLP('SearchFor.htm'), |
+      FONT('Segoe UI',10),RESIZE
+    PROMPT('&File'),AT(5,5),USE(?szSearchStringFilename:Prompt),TRN,HIDE
+    ENTRY(@S255),AT(35,5,262,10),USE(SearchOptions.szSearchStringFilename,, |
+         ?szSearchStringFilename),HIDE
+    BUTTON('...'),AT(170,5,14,10),USE(?cmdLookupSearchStringFilename),HIDE, |
+        TIP('Lookup Search String Filename')
+    PROMPT('Fi&nd'),AT(5,5),USE(?szPattern:Prompt),TRN
+    COMBO(@s255),AT(35,5,262,10),USE(SearchOptions.szPattern,, ?szPattern),VSCROLL, |
+        TIP('Specified text to be searched for.'),DROP(10),FROM(PatternQueue), |
+        ALRT(MouseRight),FORMAT('80L(2)|MS(1024)@s255@')
+    CHECK(' &Get Find Text from Specified File'),AT(35,17),USE(SearchOptions.bSearchStringsFromFile, |
+        , ?bSearchStringsFromFile),TIP('Get search strings from the specified file')
+    CHECK(' &Case Sensitive'),AT(35,35),USE(SearchOptions.bCaseSensitive,, |
+         ?bCaseSensitive),TRN,TIP('Specifies that the search is to be case-sensitive.')
+    CHECK(' Exclude Commen&t Lines'),AT(170,35),USE(SearchOptions.bExcludeComments, |
+        , ?bExcludeComments),TRN,TIP('Prints only lines that do not contain a ma' & |
+        'tch inside a comment.')
+    CHECK(' Matc&h Pattern at Start of Line'),AT(35,45),USE(SearchOptions.bMatchPatternStartOfLine, |
+        , ?bMatchPatternStartOfLine),TRN,TIP('Matches the pattern if at the begi' & |
+        'nning of a line.')
+    CHECK(' Match Pattern at &End of Line'),AT(170,45),USE(SearchOptions.bMatchPatternEndOfLine, |
+        , ?bMatchPatternEndOfLine),TRN,TIP('Matches the pattern if at the end of' & |
+        ' a line.')
+    CHECK(' Exact &Match'),AT(35,55),USE(SearchOptions.bExactMatch,, ?bExactMatch),TRN, |
+        TIP('Finds lines that match exactly.')
+    CHECK(' E&xclude Matching Lines'),AT(170,55),USE(SearchOptions.bExcludeMatch, |
+        , ?bExcludeMatch),TRN,TIP('Prints only lines that do not contain a match.')
+    CHECK(' Use &Regular Expressions'),AT(35,65),USE(SearchOptions.bUseRegularExpressions, |
+        , ?bUseRegularExpressions),TRN,TIP('Uses Find strings as regular expressions.')
+    BUTTON,AT(143,65,12,10),USE(?cmdRegExHelp),ICON('help.ico'),FLAT
+    CHECK(' Filenames &Only'),AT(170,65),USE(SearchOptions.bFilenamesOnly,, |
+         ?bFilenamesOnly),TRN,TIP('Prints only the names of files that do contai' & |
+        'n a match.')
+    CHECK(' Re&ad File List from Specified File'),AT(35,80),USE(SearchOptions.bFileListFromFile, |
+        , ?bFileListFromFile),TRN,TIP('Get the list of files to search from the ' & |
+        'specified file')
+    PROMPT('F&ile'),AT(5,92),USE(?szFileListFilename:Prompt),TRN,HIDE
+    ENTRY(@S255),AT(35,92,262,10),USE(SearchOptions.szFileListFilename,, |
+         ?szFileListFilename),HIDE
+    BUTTON('...'),AT(301,92,14,10),USE(?cmdLookupFileListFilename),HIDE, |
+        TIP('Lookup File List Filename')
+    PROMPT('&Paths'),AT(5,92),USE(?szSearchPath:Prompt),TRN
+    COMBO(@S255),AT(35,92,245,10),USE(SearchOptions.szSearchPath,, ?szSearchPath), |
+        VSCROLL,MSG('Search Path'),TIP('Search Path Starting Folder'),DROP(10), |
+        FROM(SearchPathQueue),ALRT(MouseRight),FORMAT('80L(2)|MS(1024)@s255@')
+    BUTTON('...'),AT(284,92,14,10),USE(?cmdSelectFolder),TIP('Select New Search Path')
+    BUTTON('+'),AT(301,92,14,10),USE(?cmdAddFolder),TIP('Append to Existing Sear' & |
+        'ch Path')
+    CHECK(' Search S&ubdirectories'),AT(35,107),USE(SearchOptions.bSearchSubdirectories, |
+        , ?bSearchSubdirectories),TRN,TIP('Searches for matching files in the cu' & |
+        'rrent directory and all subdirectories.')
+    PROMPT('Le&vels:'),AT(139,107),USE(?nLevels:Prompt),TRN
+    SPIN(@n3b),AT(165,107,25,10),USE(SearchOptions.nLevels,, ?nLevels),RIGHT, |
+        MSG('Subdirectory Levels to Search'),TIP('Specify the number of subdirec' & |
+        'tory levels to search.  If this value is blank then all subdirectories ' & |
+        'will be searched.'),RANGE(0,255)
+    PROMPT('&Files'),AT(5,122),USE(?szFileMask:Prompt),TRN
+    COMBO(@s255),AT(35,122,280,10),USE(SearchOptions.szFileMask,, ?szFileMask),VSCROLL, |
+        TIP('Specifies a file or files to search.<0DH,0AH>The elements in the st' & |
+        'ring may be delimited by vertical bars (|) ,  semicolons (;), or spaces.'), |
+        DROP(10),FROM(FileMaskQueue),ALRT(MouseRight),FORMAT('80L(2)|MS(1024)@s255@')
+    PROMPT('E&xclude'),AT(5,137),USE(?szExcludeMask:Prompt),TRN
+    COMBO(@s255),AT(35,137,280,10),USE(SearchOptions.szExcludeMask,, ?szExcludeMask), |
+        VSCROLL,TIP('Specifies a file or files to be excluded from the search.' & |
+        '<0DH,0AH>The elements in the string may be delimited by vertical bars (' & |
+        '|) ,  semicolons (;), or spaces.'),DROP(10),FROM(ExcludeMaskQueue), |
+        ALRT(MouseRight),FORMAT('80L(2)|MS(1024)@s255@')
+    BUTTON('&Load Saved Results'),AT(35,152,70,14),USE(?cmdLoadSavedResults)
+    BUTTON('&Search'),AT(140,152,70,14),USE(?cmdSearch),DEFAULT
+    BUTTON('Search Ne&w Tab'),AT(245,152,70,14),USE(?cmdSearchNew)
+    CHECK(' Include files with binary content'),AT(170,80),USE(glo:DisableSlashP), |
+        VALUE('1','0'),TIP('Disables /P in FINDSTR.')
+  END
 
     omit('***',WE::CantCloseNowSetHereDone=1)  !Getting Nested omit compile error, then uncheck the "Check for duplicate CantCloseNowSetHere variable declaration" in the WinEvent local template
 WE::CantCloseNowSetHereDone equate(1)

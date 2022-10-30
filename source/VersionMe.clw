@@ -1,1 +1,1 @@
-glo:szVersion        CSTRING('2022.1.21.24')
+glo:szVersion        CSTRING('2022.10.30.29')
