@@ -2052,6 +2052,7 @@ MONITOR_DEFAULTTOPRIMARY   EQUATE(00000001h)
   SELF.Open(Window)                                        ! Open window
   Window{PROP:Timer} = 0
   SYSTEM{PROP:LazyDisplay} = 1
+  Window{PROP:Text} = 'KSSOpen (Hand code edition) ' & glo:szVersion
   glo:MainWindow &= Window
   BUTTON:NextFolder      = ?cmdNextFolder
   BUTTON:PreviousFolder  = ?cmdPreviousFolder
