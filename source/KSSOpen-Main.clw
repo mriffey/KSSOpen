@@ -314,7 +314,8 @@ Window               WINDOW('KSSOpen (Hand code edition)'),AT(,,600,273),FONT('S
                        END
                        TEXT,AT(462,1,136,240),USE(?sciControl:Region),FONT(,,COLOR:BTNTEXT)
                        BOX,AT(0,0,460,25),USE(?Application:Box),COLOR(COLOR:Red),FILL(00C0C0FFh),LINEWIDTH(1)
-                       SHEET,AT(0,0,460,255),USE(CurrentSearch),HSCROLL,COLOR(00F0F0F0h)
+                       !SHEET,AT(0,0,460,255),USE(CurrentSearch),HSCROLL,COLOR(00F0F0F0h)
+                       SHEET,AT(0,0,460,255),USE(CurrentSearch),HSCROLL! ,COLOR(00F0F0F0h)
                          TAB('New Search'),USE(?Search1)
                          END
                        END

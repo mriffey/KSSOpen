@@ -11,7 +11,7 @@ File ID,File Name,Destination Folder,Source Folder,Feature,Date,Time,Size (bytes
 00010,CWHHla.dll,%_SB_INSTALLDIR%,C:\Projects\KSSOpen\Source\bin,Always Install,2019/11/14,21:17:17,10752,11.0.0.13244,869C9FD4,
 00011,html.properties,%_SB_INSTALLDIR%,C:\Projects\KSSOpen\Source\bin,Always Install,2022/01/03,14:48:30,14737,,D8A60759,
 00012,java.properties,%_SB_INSTALLDIR%,C:\Projects\KSSOpen\Source\bin,Always Install,2022/01/03,14:48:30,6312,,385899A0,
-00013,KSSOpen.exe,%_SB_INSTALLDIR%,C:\Projects\KSSOpen\Source\bin,Always Install,2022/10/30,11:53:13,4890460,2022.10.30.29,F548B852,
+00013,KSSOpen.exe,%_SB_INSTALLDIR%,C:\Projects\KSSOpen\Source\bin,Always Install,2022/10/30,12:10:46,4890460,2022.10.30.30,98E2CF30,
 00014,mssql.properties,%_SB_INSTALLDIR%,C:\Projects\KSSOpen\Source\bin,Always Install,2022/01/03,14:48:30,31392,,DDFD8A60,
 00015,msvcr70.dll,%_SB_INSTALLDIR%,C:\Projects\KSSOpen\Source\bin,Always Install,2022/01/03,14:48:30,344064,7.0.9466.0,516C28BC,
 00016,mysql.properties,%_SB_INSTALLDIR%,C:\Projects\KSSOpen\Source\bin,Always Install,2022/01/03,14:48:30,11501,,30622EDD,
