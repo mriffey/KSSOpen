@@ -1,8 +1,8 @@
 LANGUAGE 0x0409
 
 1 VERSIONINFO
- FILEVERSION 2022,10,30,31
- PRODUCTVERSION 2022,10,30,31
+ FILEVERSION 2024,2,8,34
+ PRODUCTVERSION 2024,2,8,34
  FILEFLAGSMASK 0x3FL
  FILEFLAGS 0x1L
  FILEOS VOS__WINDOWS32
@@ -14,15 +14,15 @@ BEGIN
     BLOCK "040904E4"
       BEGIN
         VALUE "CompanyName", "Devuna\0"
-        VALUE "FileDescription", "KSSOpen 2022.10.30.31 Build 31\0"
-        VALUE "FileVersion", "2022.10.30.31\0"
+        VALUE "FileDescription", "KSSOpen 2024.2.8.34 Build 34\0"
+        VALUE "FileVersion", "2024.2.8.34\0"
         VALUE "InternalName", "KSSOpen\0"
-        VALUE "LegalCopyright", "Copyright (c) 2011-2022 Devuna\0"
-        VALUE "LegalTrademarks", "KSSOpen - Open source, hand code fork 2022-10-30\0"
+        VALUE "LegalCopyright", "Copyright (c) 2011-2024 Devuna\0"
+        VALUE "LegalTrademarks", "KSSOpen - Open source, hand code fork 2024-02-08\0"
         VALUE "OriginalFilename", "KSSOpen.EXE\0"
         VALUE "ProductName", "KSSOpen\0"
-        VALUE "ProductVersion", "2022.10.30.31\0"
-        VALUE "Comments", "2022.10.30.31 Build 31\0"
+        VALUE "ProductVersion", "2024.2.8.34\0"
+        VALUE "Comments", "2024.2.8.34 Build 34\0"
       END
     END
     BLOCK "VarFileInfo"

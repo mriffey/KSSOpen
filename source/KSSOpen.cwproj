@@ -186,6 +186,6 @@
   </ItemGroup>
   <Import Project="$(ClarionBinPath)\SoftVelocity.Build.Clarion.targets" />
   <PropertyGroup>
-    <PreBuildEvent>$(SolutionDir)\bin\VersionMe.exe PROJECT=$(OutputName) BINARYTYPE=$(OutputType) APPFOLDER=$(SolutionDir)</PreBuildEvent>
+    <PreBuildEvent>$(SolutionDir)bin\VersionMe.exe PROJECT=$(OutputName) BINARYTYPE=$(OutputType) APPFOLDER=$(SolutionDir)</PreBuildEvent>
   </PropertyGroup>
 </Project>
