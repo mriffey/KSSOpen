@@ -222,6 +222,39 @@ hThread                 HANDLE
 dwProcessId             DWORD
 dwThreadId              DWORD
                      END
+SearchQueueType      QUEUE,TYPE
+tabNumber                  LONG
+bMatchPatternStartOfLine   BOOL
+bMatchPatternEndOfLine     BOOL
+bUseRegularExpressions     BOOL
+bSearchSubdirectories      BOOL
+nLevels                    BYTE
+nCurrentLevel              BYTE
+bCaseSensitive             BOOL
+bExactMatch                BOOL
+bExcludeMatch              BOOL
+bExcludeComments           BOOL
+!bIncludeBinary             BOOL
+bSearchPressed             BOOL
+szPattern                  CSTRING(1025)
+szSearchPath               CSTRING(1025)
+szFileMask                 CSTRING(256)
+szMatchesFound             CSTRING(256)
+ResultQueue                &ResultQueueType
+UndoQueue                  &ResultQueueType
+feqSearchProgress          LONG
+lPointer                   LONG
+bFilenamesOnly             BOOL
+bFileListFromFile          BOOL
+szFileListFilename         CSTRING(261)
+bSearchStringsFromFile     BOOL
+szSearchStringFilename     CSTRING(261)
+szPropertyFile             CSTRING(33)
+szExcludeMask              CSTRING(256)
+szListBoxFormat            CSTRING(256)
+FindGroup                  LIKE(FindGrp)
+szReplaceWith              LIKE(FindGrp.What)
+                     END 
 ResultQueueType      QUEUE,TYPE
 Path                   CSTRING(261)
 Filename               CSTRING(261)
@@ -412,6 +445,7 @@ CtrlShiftBar   EQUATE(988)
    INCLUDE('ABFUZZY.INC'),ONCE
    INCLUDE('UltimateDebug.INC'),ONCE 
    INCLUDE('xfiles.inc'),ONCE
+   INCLUDE('reflection.inc'),ONCE 
    INCLUDE('StringTheory.Inc'),ONCE
 !    Include('WinEvent.Inc'),Once
    INCLUDE('ABEIP.INC')
@@ -478,6 +512,9 @@ GetCommentStyle        FUNCTION(*CSTRING szExtension),LONG   !
      MODULE('KSSOpen-SaveResults.CLW')
 SaveResults            FUNCTION(FindStrOptionsGroupType FindStrOptions, *CSTRING szSendToFilename),BOOL   !
      END
+     MODULE('KSSOpen-SaveResultsAll.CLW')
+SaveResultsAll         FUNCTION(FindStrOptionsGroupType FindStrOptions, *CSTRING szSendToFilename),BOOL   !
+     END
      MODULE('KSSOpen-MRUContextMenu.CLW')
 MRUContextMenu         PROCEDURE( MRUQueueType MRUQueue, LONG feqControl, STRING strDefault)   !
      END
@@ -501,6 +538,7 @@ ListBoxFormatter       FUNCTION(ListFormatQueueType pListFormatQueue),STRING   !
      END
      MODULE('KSSOpen-RestorePointIO.CLW')
 CreateRestorePoint     FUNCTION(FindStrOptionsGroupType pFindStrOptions, *CSTRING szFilename),LONG,PROC   !
+CreateRestorePointAll  FUNCTION(FindStrOptionsGroupType pFindStrOptions, *CSTRING szFilename),LONG,PROC 
 LoadRestorePoint       FUNCTION(FindStrOptionsGroupType pFindStrOptions, <*CSTRING szRestorePointFile>),LONG,PROC   !
      END
      MODULE('KSSOpen-winShowMatchSummary.CLW')

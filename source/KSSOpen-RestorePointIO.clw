@@ -25,6 +25,18 @@
 !!! <summary>
 !!! Generated from procedure template - Source
 !!! </summary>
+
+CreateRestorePointAll   PROCEDURE  (FindStrOptionsGroupType pFindStrOptions, *CSTRING szFilename) ! Declare Procedure'
+ CODE
+ MESSAGE('Save all results ("this KSS session") to a file')
+ 
+! for each tab
+! set the resultQueue, then call with a generated szFilename
+!    CreateRestorePoint(pFindStrOptions pFindStrOptions, *CSTRING szFilename)
+
+ RETURN TRUE 
+ 
+
 CreateRestorePoint   PROCEDURE  (FindStrOptionsGroupType pFindStrOptions, *CSTRING szFilename) ! Declare Procedure
 !region Notices
 ! ================================================================================

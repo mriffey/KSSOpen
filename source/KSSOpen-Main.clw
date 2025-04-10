@@ -246,91 +246,106 @@ szSearchPath         LIKE(szSearchPath)                    !
 FileMaskQueue        QUEUE,PRE(FileMaskQueue)              ! 
 szFileMask           LIKE(szFileMask)                      ! 
                      END                                   ! 
-Window               WINDOW('KSSOpen (Hand code edition)'),AT(,,600,273),FONT('Segoe UI',10,,,CHARSET:ANSI), |
-  RESIZE,ALRT(03DCh),ALRT(CtrlEnd),ALRT(CtrlHome),ALRT(DownKey),ALRT(PgDnKey),ALRT(PgUpKey), |
-  ALRT(UpKey),COLOR(,COLOR:Yellow),ICON('kss.ico'),GRAY,IMM,MAX,HLP('Main.htm'),STATUS(-1, |
-  50,170,100),SYSTEM,TIMER(5)
-                       TOOLBAR,AT(0,0,600,30),USE(?Toolbar1),COLOR(00F2E4D7h)
-                         BUTTON('&Search'),AT(2,2,50,14),USE(?cmdSearch),LEFT,ICON('search.ico'),DEFAULT,FLAT,TIP('Search for' & |
-  '...<09H>[Ctrl+F]')
-                         BUTTON,AT(55,2,18,14),USE(?cmdRedoSearch),ICON('RedoSearch.ico'),FLAT,TIP('Redo the las' & |
-  't search<0DH,0AH>without dialog<09H>[F5]')
-                         PANEL,AT(75,3,1,12),USE(?Separator3),BEVEL(1)
-                         BUTTON,AT(78,2,18,14),USE(?cmdPreviousFolder),ICON('PreviousFolder.ico'),FLAT,TIP('Jump to Pr' & |
-  'evious Folder<0DH,0AH>in Results List')
-                         BUTTON,AT(98,2,18,14),USE(?cmdPreviousFile),ICON('PreviousFile.ico'),FLAT,TIP('Jump to Pr' & |
-  'evious File<0DH,0AH>in Results List')
-                         BUTTON,AT(118,2,18,14),USE(?cmdPreviousLine),ICON('PreviousLine.ico'),FLAT,TIP('Jump to Pr' & |
-  'evious Line<0DH,0AH>in Results List<09H>[MinusKey]')
-                         BUTTON,AT(138,2,18,14),USE(?cmdNextLine),ICON('NextLine.ico'),FLAT,TIP('Jump to Next Li' & |
-  'ne<0DH,0AH>in Results List<09H>[PlusKey]')
-                         BUTTON,AT(158,2,18,14),USE(?cmdNextFile),ICON('NextFile.ico'),FLAT,TIP('Jump to Next Fi' & |
-  'le<0DH,0AH>in Results List')
-                         BUTTON,AT(178,2,18,14),USE(?cmdNextFolder),ICON('NextFolder.ico'),FLAT,TIP('Jump to Nex' & |
-  't Folder<0DH,0AH>in Results List')
-                         PANEL,AT(198,3,1,12),USE(?Separator1),BEVEL(1)
-                         BUTTON,AT(202,2,18,14),USE(?cmdDeleteLine),ICON('DeleteLine.ico'),FLAT,TIP('Delete Sele' & |
-  'cted Line<0DH,0AH>from Results List<09H>[Delete]')
-                         BUTTON,AT(222,2,18,14),USE(?cmdDeleteFile),ICON('DeleteFile.ico'),FLAT,TIP('Delete Sele' & |
-  'cted File<0DH,0AH>from Results List<09H>[Alt+Delete]')
-                         BUTTON,AT(242,2,18,14),USE(?cmdDeleteExtension),ICON('DeleteExtension.ico'),FLAT,TIP('Delete Sel' & |
-  'ected File Extension<0DH,0AH>from Results List')
-                         BUTTON,AT(262,2,18,14),USE(?cmdDeletePath),ICON('DeletePath.ico'),FLAT,TIP('Delete Sele' & |
-  'cted Path<0DH,0AH>from Results List')
-                         BUTTON,AT(282,2,18,14),USE(?cmdDeleteComments),ICON('DeleteComment.ico'),FLAT,TIP('Delete Com' & |
-  'ments<0DH,0AH>from Results List')
-                         BUTTON,AT(302,2,18,14),USE(?cmdDeleteLabels),ICON('DeleteLabel.ico'),FLAT,TIP('Delete Lab' & |
-  'els<0DH,0AH>from Results List')
-                         BUTTON,AT(322,2,18,14),USE(?cmdDeleteCode),ICON('DeleteCode.ico'),FLAT,TIP('Delete Matc' & |
-  'hes Found in Code<0DH,0AH>from Results List')
-                         BUTTON,AT(342,2,18,14),USE(?cmdDeleteData),ICON('DeleteData.ico'),FLAT,TIP('Delete Matc' & |
-  'hes Found in Data<0DH,0AH>from Results List')
-                         BUTTON,AT(363,2,18,14),USE(?cmdDeleteBuiltInClw),COLOR(00F2E4D7h),ICON('ClarionBuiltIn.ico'), |
-  FLAT,TIP('Delete *_BC*.clw, *_R*.clw, *_SF.clw files from Results List')
-                         BUTTON,AT(389,2,18,14),USE(?cmdFindAndDelete),ICON('FindDelete.ico'),FLAT,TIP('Find and D' & |
-  'elete<0DH,0AH>in Results List...<09H>[Ctrl+Delete]')
-                         BUTTON,AT(409,2,18,14),USE(?cmdUndoDelete),ICON('UndoDelete.ico'),FLAT,TIP('Undo Delete' & |
-  '<0DH,0AH>Ctrl+Z')
-                         PANEL,AT(430,3,1,12),USE(?Separator2),BEVEL(1)
-                         BUTTON,AT(433,2,18,14),USE(?cmdReplaceResults),ICON('Replace.ico'),FLAT,TIP('Replace ..' & |
-  '.<09H>[Ctrl+R]')
-                         BUTTON,AT(453,2,18,14),USE(?cmdSave),ICON('FileSave.ico'),FLAT,TIP('Save Results ...')
-                         BUTTON,AT(473,2,18,14),USE(?cmdEdit),ICON('SendTo.ico'),FLAT,TIP('Send To Command<09H>[Ctrl+E]')
-                         PANEL,AT(493,3,1,12),USE(?Separator4),BEVEL(1)
-                         BUTTON,AT(496,2,18,14),USE(?cmdUserOptions),ICON('UserOptions.ico'),FLAT,TIP('Options ...')
-                         BUTTON,AT(516,2,18,14),USE(?cmdLayout),ICON('splith.ico'),FLAT,TIP('Switch to Horizontal Layout')
-                         BUTTON,AT(536,2,18,14),USE(?cmdHelp),ICON('help.ico'),FLAT,TIP('Help')
-                         STRING(@S255),AT(566,4,,8),USE(szTitle),RIGHT
-                         BUTTON,AT(598,4,10,8),USE(?cmdSaveWarn),ICON('save-warn.png'),DISABLE,FLAT,SKIP
-                         PROMPT('Cmt'),AT(286,19),USE(?PROMPT1),FONT(,8),TRN
-                         PROMPT('Lbl'),AT(306,19),USE(?PROMPT1:2),FONT(,8),COLOR(00F2E4D7h),TRN
-                         PROMPT('Code'),AT(323,19),USE(?PROMPT1:3),FONT(,8),COLOR(00F2E4D7h),TRN
-                         PROMPT('Data'),AT(344,19),USE(?PROMPT1:4),FONT(,8),COLOR(00F2E4D7h),TRN
-                         PROMPT('File'),AT(226,19),USE(?PROMPT1:5),FONT(,8),COLOR(00F2E4D7h),TRN
-                         PROMPT('Ext'),AT(247,19),USE(?PROMPT1:6),FONT(,8),COLOR(00F2E4D7h),TRN
-                         PROMPT('Folder'),AT(262,19),USE(?PROMPT1:7),FONT(,8),COLOR(00F2E4D7h),TRN
-                         PROMPT('Line'),AT(205,19),USE(?PROMPT1:8),FONT(,8),COLOR(00F2E4D7h),TRN
-                         PROMPT('BC*/SF/R*'),AT(361,19),USE(?PROMPT1:9),FONT(,8),COLOR(00F2E4D7h),TRN
-                       END
-                       TEXT,AT(462,1,136,240),USE(?sciControl:Region),FONT(,,COLOR:BTNTEXT)
-                       BOX,AT(0,0,460,25),USE(?Application:Box),COLOR(COLOR:Red),FILL(00C0C0FFh),LINEWIDTH(1)
-                       !SHEET,AT(0,0,460,255),USE(CurrentSearch),HSCROLL,COLOR(00F0F0F0h)
-                       SHEET,AT(0,0,460,255),USE(CurrentSearch),HSCROLL! ,COLOR(00F0F0F0h)
-                         TAB('New Search'),USE(?Search1)
-                         END
-                       END
-                       BUTTON,AT(2,14,16,12),USE(?cmdCloseTab),ICON('CloseTab.ico'),FLAT,SKIP,TIP('Close Tab')
-                       BUTTON,AT(2,14,16,12),USE(?cmdCancelSearch),ICON('CancelSearch.ico'),FLAT,HIDE,SKIP,TIP('Cancel Search')
-                       STRING(@s255),AT(20,16,398),USE(SearchQueue.szMatchesFound,,?szMatchesFound),TRN
-                       LIST,AT(1,28,456,213),USE(?ResultList),VSCROLL,ALRT(CtrlC),ALRT(CtrlE),ALRT(CtrlF),ALRT(CtrlF4), |
-  ALRT(CtrlT),ALRT(CtrlV),ALRT(CtrlW),ALRT(CtrlZ),ALRT(DeleteKey),ALRT(EnterKey),ALRT(F5Key), |
-  ALRT(MouseLeft2),ALRT(MouseRight),COLOR(COLOR:WINDOW),FORMAT('175L(2)|M~Path~S(1024)@' & |
-  's255@62L(2)|M~Filename~S(1024)@s255@28L(2)|M~Ext~C(0)@s15@28R(2)|M~Line~C(0)@n15@50L' & |
-  '(2)|M~Location~S(1024)@s255@175L(2)|M~Text~S(1024)@s255@'),FROM(EasyListPrintQueue)
-                       REGION,AT(460,0,2,260),USE(?SplitterBar),FILL(00B48246h),IMM
-                       STRING(@S255),AT(10,147,568,8),USE(szTitle,,?szTitle:2),COLOR(COLOR:Red)
-                       BUTTON,AT(0,147,10,8),USE(?cmdSaveWarn:2),ICON('save-warn.png'),DISABLE,FLAT,SKIP
-                     END
+Window WINDOW('KSSOpen (Hand code edition)'),AT(,,810,273),GRAY,IMM,SYSTEM,MAX, |
+      ICON('kss.ico'),STATUS(-1,50,170,100),HLP('Main.htm'),FONT('Segoe UI',10,, |
+      ,CHARSET:ANSI),TIMER(5),ALRT(988), ALRT(CtrlEnd), ALRT(CtrlHome), |
+       ALRT(DownKey), ALRT(PgDnKey), ALRT(PgUpKey), ALRT(UpKey),COLOR(,COLOR:Yellow), |
+      RESIZE
+    TOOLBAR,AT(0,0,810,30),USE(?Toolbar1),COLOR(0F2E4D7H)
+      BUTTON('&Search'),AT(2,2,50,14),USE(?cmdSearch),ICON('search.ico'),DEFAULT, |
+          TIP('Search for...<09H>[Ctrl+F]'),FLAT,LEFT
+      BUTTON,AT(55,2,18,14),USE(?cmdRedoSearch),ICON('RedoSearch.ico'), |
+          TIP('Redo the last search<0DH,0AH>without dialog<09H>[F5]'),FLAT
+      PANEL,AT(75,3,1,12),USE(?Separator3),BEVEL(1)
+      BUTTON,AT(78,2,18,14),USE(?cmdPreviousFolder),ICON('PreviousFolder.ico'), |
+          TIP('Jump to Previous Folder<0DH,0AH>in Results List'),FLAT
+      BUTTON,AT(98,2,18,14),USE(?cmdPreviousFile),ICON('PreviousFile.ico'), |
+          TIP('Jump to Previous File<0DH,0AH>in Results List'),FLAT
+      BUTTON,AT(118,2,18,14),USE(?cmdPreviousLine),ICON('PreviousLine.ico'), |
+          TIP('Jump to Previous Line<0DH,0AH>in Results List<09H>[MinusKey]'),FLAT
+      BUTTON,AT(138,2,18,14),USE(?cmdNextLine),ICON('NextLine.ico'),TIP('Jump to' & |
+          ' Next Line<0DH,0AH>in Results List<09H>[PlusKey]'),FLAT
+      BUTTON,AT(158,2,18,14),USE(?cmdNextFile),ICON('NextFile.ico'),TIP('Jump to' & |
+          ' Next File<0DH,0AH>in Results List'),FLAT
+      BUTTON,AT(178,2,18,14),USE(?cmdNextFolder),ICON('NextFolder.ico'), |
+          TIP('Jump to Next Folder<0DH,0AH>in Results List'),FLAT
+      PANEL,AT(198,3,1,12),USE(?Separator1),BEVEL(1)
+      BUTTON,AT(202,2,18,14),USE(?cmdDeleteLine),ICON('DeleteLine.ico'), |
+          TIP('Delete Selected Line<0DH,0AH>from Results List<09H>[Delete]'),FLAT
+      BUTTON,AT(222,2,18,14),USE(?cmdDeleteFile),ICON('DeleteFile.ico'), |
+          TIP('Delete Selected File<0DH,0AH>from Results List<09H>[Alt+Delete]'),FLAT
+      BUTTON,AT(242,2,18,14),USE(?cmdDeleteExtension),ICON('DeleteExtension.ico'), |
+          TIP('Delete Selected File Extension<0DH,0AH>from Results List'),FLAT
+      BUTTON,AT(262,2,18,14),USE(?cmdDeletePath),ICON('DeletePath.ico'), |
+          TIP('Delete Selected Path<0DH,0AH>from Results List'),FLAT
+      BUTTON,AT(282,2,18,14),USE(?cmdDeleteComments),ICON('DeleteComment.ico'), |
+          TIP('Delete Comments<0DH,0AH>from Results List'),FLAT
+      BUTTON,AT(302,2,18,14),USE(?cmdDeleteLabels),ICON('DeleteLabel.ico'), |
+          TIP('Delete Labels<0DH,0AH>from Results List'),FLAT
+      BUTTON,AT(322,2,18,14),USE(?cmdDeleteCode),ICON('DeleteCode.ico'), |
+          TIP('Delete Matches Found in Code<0DH,0AH>from Results List'),FLAT
+      BUTTON,AT(342,2,18,14),USE(?cmdDeleteData),ICON('DeleteData.ico'), |
+          TIP('Delete Matches Found in Data<0DH,0AH>from Results List'),FLAT
+      BUTTON,AT(363,2,18,14),USE(?cmdDeleteBuiltInClw),COLOR(0F2E4D7H), |
+          ICON('ClarionBuiltIn.ico'),TIP('Delete *_BC*.clw, *_R*.clw, *_SF.clw f' & |
+          'iles from Results List'),FLAT
+      BUTTON,AT(389,2,18,14),USE(?cmdFindAndDelete),ICON('FindDelete.ico'), |
+          TIP('Find and Delete<0DH,0AH>in Results List...<09H>[Ctrl+Delete]'),FLAT
+      BUTTON,AT(409,2,18,14),USE(?cmdUndoDelete),ICON('UndoDelete.ico'), |
+          TIP('Undo Delete<0DH,0AH>Ctrl+Z'),FLAT
+      PANEL,AT(430,3,1,12),USE(?Separator2),BEVEL(1)
+      BUTTON,AT(433,2,18,14),USE(?cmdReplaceResults),ICON('Replace.ico'), |
+          TIP('Replace ...<09H>[Ctrl+R]'),FLAT
+      BUTTON,AT(453,2,18,14),USE(?cmdSave),ICON('FileSave.ico'),TIP('Save Results ...'), |
+          FLAT
+      BUTTON,AT(473,2,18,14),USE(?cmdEdit),ICON('SendTo.ico'),TIP('Send To Comma' & |
+          'nd<09H>[Ctrl+E]'),FLAT
+      PANEL,AT(493,3,1,12),USE(?Separator4),BEVEL(1)
+      BUTTON,AT(535,2,18,14),USE(?cmdUserOptions),ICON('UserOptions.ico'), |
+          TIP('Options ...'),FLAT
+      BUTTON,AT(555,2,18,14),USE(?cmdLayout),ICON('splith.ico'),TIP('Switch to H' & |
+          'orizontal Layout'),FLAT
+      BUTTON,AT(575,2,18,14),USE(?cmdHelp),ICON('help.ico'),TIP('Help'),FLAT
+      STRING(@S255),AT(599,4,,8),USE(szTitle),RIGHT
+      BUTTON,AT(598,4,10,8),USE(?cmdSaveWarn),DISABLE,SKIP,ICON('save-warn.png'),FLAT
+      PROMPT('Cmt'),AT(286,19),USE(?PROMPT1),TRN,FONT(,8)
+      PROMPT('Lbl'),AT(306,19),USE(?PROMPT1:2),TRN,FONT(,8),COLOR(0F2E4D7H)
+      PROMPT('Code'),AT(323,19),USE(?PROMPT1:3),TRN,FONT(,8),COLOR(0F2E4D7H)
+      PROMPT('Data'),AT(344,19),USE(?PROMPT1:4),TRN,FONT(,8),COLOR(0F2E4D7H)
+      PROMPT('File'),AT(226,19),USE(?PROMPT1:5),TRN,FONT(,8),COLOR(0F2E4D7H)
+      PROMPT('Ext'),AT(247,19),USE(?PROMPT1:6),TRN,FONT(,8),COLOR(0F2E4D7H)
+      PROMPT('Folder'),AT(262,19),USE(?PROMPT1:7),TRN,FONT(,8),COLOR(0F2E4D7H)
+      PROMPT('Line'),AT(205,19),USE(?PROMPT1:8),TRN,FONT(,8),COLOR(0F2E4D7H)
+      PROMPT('BC*/SF/R*'),AT(361,19),USE(?PROMPT1:9),TRN,FONT(,8),COLOR(0F2E4D7H)
+      PANEL,AT(531,3,1,12),USE(?Separator4:3),BEVEL(1)
+      BUTTON,AT(498,2,18,14),USE(?cmdSaveAll),COLOR(0F2E4D7H),ICON('FileSaveAll.ico'), |
+          TIP('Save Results ...'),FLAT
+    END
+    TEXT,AT(462,1,136,240),USE(?sciControl:Region),FONT(,,COLOR:BTNTEXT)
+    BOX,AT(0,0,460,25),USE(?Application:Box),COLOR(COLOR:Red),FILL(0C0C0FFH), |
+        LINEWIDTH(1)
+    !SHEET,AT(0,0,460,255),USE(CurrentSearch),HSCROLL,COLOR(00F0F0F0h)
+    ! ,COLOR(00F0F0F0h)
+    SHEET,AT(0,0,460,255),USE(CurrentSearch),HSCROLL
+      TAB('New Search'),USE(?Search1)
+      END
+    END
+    BUTTON,AT(2,14,16,12),USE(?cmdCloseTab),SKIP,ICON('CloseTab.ico'),TIP('Close Tab'), |
+        FLAT
+    BUTTON,AT(2,14,16,12),USE(?cmdCancelSearch),SKIP,ICON('CancelSearch.ico'),HIDE, |
+        TIP('Cancel Search'),FLAT
+    STRING(@s255),AT(20,16,398),USE(SearchQueue.szMatchesFound,, ?szMatchesFound),TRN
+    LIST,AT(1,28,456,213),USE(?ResultList),VSCROLL,COLOR(COLOR:WINDOW), |
+        FROM(EasyListPrintQueue),FORMAT('175L(2)|M~Path~S(1024)@s255@62L(2)|M~Fi' & |
+        'lename~S(1024)@s255@28L(2)|M~Ext~C(0)@s15@28R(2)|M~Line~C(0)@n15@50L(2)' & |
+        '|M~Location~S(1024)@s255@175L(2)|M~Text~S(1024)@s255@'),ALRT(CtrlC), |
+         ALRT(CtrlE), ALRT(CtrlF), ALRT(CtrlF4), ALRT(CtrlT), ALRT(CtrlV), |
+         ALRT(CtrlW), ALRT(CtrlZ), ALRT(DeleteKey), ALRT(EnterKey), ALRT(F5Key), |
+         ALRT(MouseLeft2), ALRT(MouseRight)
+    REGION,AT(460,0,2,260),USE(?SplitterBar),FILL(0B48246H),IMM
+    STRING(@S255),AT(10,147,568,8),USE(szTitle,, ?szTitle:2),COLOR(COLOR:Red)
+    BUTTON,AT(0,147,10,8),USE(?cmdSaveWarn:2),DISABLE,SKIP,ICON('save-warn.png'),FLAT
+  END
 
 LastToolbarButton  EQUATE(?cmdHelp)
 SplitterBarSize    EQUATE(4)
@@ -2779,6 +2794,14 @@ Looped BYTE
       ThisWindow.Update()
       findStrOptions = SearchQueue
       IF SaveResults(findStrOptions, szSendToFilename)
+         !SendTo
+         !POST(EVENT:Accepted,?cmdEdit)
+         DO CheckEditor
+      END
+    OF ?cmdSaveAll
+      ThisWindow.Update()
+      findStrOptions = SearchQueue
+      IF SaveResultsAll(findStrOptions, szSendToFilename)
          !SendTo
          !POST(EVENT:Accepted,?cmdEdit)
          DO CheckEditor
