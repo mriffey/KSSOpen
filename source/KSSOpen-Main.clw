@@ -2831,6 +2831,7 @@ Looped BYTE
           szBulkFile = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\KSS_Results_SaveAllTabs_*.json'           
        END
        FileLookup2.DefaultFile = szBulkFile
+       FileLookup2.ClearOnCancel = TRUE 
        szBulkFile = FileLookup2.Ask(1)
        IF szBulkFile <> ''
        ELSE 
@@ -2873,7 +2874,7 @@ Looped BYTE
           END               
        END 
        IF RECORDS(qCRPALoad) > 0
-          MESSAGE(RECORDS(qCRPALoad) & ' tabs restored.')
+          !MESSAGE(RECORDS(qCRPALoad) & ' tabs restored.')
        ELSE
           MESSAGE('No saved tabs found in ' & szBulkFile)
        END
