@@ -199,6 +199,7 @@ RemainingCount          LONG
 DeleteQueue             QUEUE,PRE(DQ)
 pointer                    LONG
                         END
+szBulkFile              CSTRING(MAX_PATH)
 bTrackMouse             BOOL
 ViewerActive            BYTE
 ListWithFocus           LONG(34)  !-1)
@@ -302,13 +303,13 @@ Window WINDOW('KSSOpen (Hand code edition)'),AT(,,810,273),GRAY,IMM,SYSTEM,MAX, 
       BUTTON,AT(473,2,18,14),USE(?cmdEdit),ICON('SendTo.ico'),TIP('Send To Comma' & |
           'nd<09H>[Ctrl+E]'),FLAT
       PANEL,AT(493,3,1,12),USE(?Separator4),BEVEL(1)
-      BUTTON,AT(535,2,18,14),USE(?cmdUserOptions),ICON('UserOptions.ico'), |
+      BUTTON,AT(551,2,18,14),USE(?cmdUserOptions),ICON('UserOptions.ico'), |
           TIP('Options ...'),FLAT
-      BUTTON,AT(555,2,18,14),USE(?cmdLayout),ICON('splith.ico'),TIP('Switch to H' & |
+      BUTTON,AT(571,2,18,14),USE(?cmdLayout),ICON('splith.ico'),TIP('Switch to H' & |
           'orizontal Layout'),FLAT
-      BUTTON,AT(575,2,18,14),USE(?cmdHelp),ICON('help.ico'),TIP('Help'),FLAT
-      STRING(@S255),AT(599,4,,8),USE(szTitle),RIGHT
-      BUTTON,AT(598,4,10,8),USE(?cmdSaveWarn),DISABLE,SKIP,ICON('save-warn.png'),FLAT
+      BUTTON,AT(591,2,18,14),USE(?cmdHelp),ICON('help.ico'),TIP('Help'),FLAT
+      STRING(@S255),AT(615,4,,8),USE(szTitle),RIGHT
+      BUTTON,AT(614,4,10,8),USE(?cmdSaveWarn),DISABLE,SKIP,ICON('save-warn.png'),FLAT
       PROMPT('Cmt'),AT(286,19),USE(?PROMPT1),TRN,FONT(,8)
       PROMPT('Lbl'),AT(306,19),USE(?PROMPT1:2),TRN,FONT(,8),COLOR(0F2E4D7H)
       PROMPT('Code'),AT(323,19),USE(?PROMPT1:3),TRN,FONT(,8),COLOR(0F2E4D7H)
@@ -318,10 +319,16 @@ Window WINDOW('KSSOpen (Hand code edition)'),AT(,,810,273),GRAY,IMM,SYSTEM,MAX, 
       PROMPT('Folder'),AT(262,19),USE(?PROMPT1:7),TRN,FONT(,8),COLOR(0F2E4D7H)
       PROMPT('Line'),AT(205,19),USE(?PROMPT1:8),TRN,FONT(,8),COLOR(0F2E4D7H)
       PROMPT('BC*/SF/R*'),AT(361,19),USE(?PROMPT1:9),TRN,FONT(,8),COLOR(0F2E4D7H)
-      PANEL,AT(531,3,1,12),USE(?Separator4:3),BEVEL(1)
-      BUTTON,AT(498,2,18,14),USE(?cmdSaveAll),COLOR(0F2E4D7H),ICON('FileSaveAll.ico'), |
-          TIP('Save Results ...'),FLAT
-      BUTTON('Load All Search Tabs'),AT(498,19,,9),USE(?btnLoadAll),FONT(,9)
+      PANEL,AT(547,3,1,12),USE(?Separator4:3),BEVEL(1)
+      BUTTON,AT(498,2,18,14),USE(?cmdSaveAll),COLOR(0F2E4D7H),ICON('SaveMultiple.ico'), |
+          TIP('Save all tabs ...'),FLAT
+      BUTTON,AT(525,2,18,14),USE(?cmdLoadAll),COLOR(0F2E4D7H),ICON('LoadMultiple.ico'), |
+          TIP('Reload saved tabs'),FLAT
+      PROMPT('Save all'),AT(497,19),USE(?PROMPT1:10),TRN,FONT(,8),COLOR(0F2E4D7H)
+      PROMPT('Load all'),AT(523,19),USE(?promptLoadAll),TRN,FONT(,8),COLOR(0F2E4D7H)
+      ENTRY(@s255),AT(653,18,151,9),USE(szBulkFile),FLAT,FONT(,10),COLOR(COLOR:White), |
+          TIP('File name for Save All / Load All')
+      BUTTON('"All" file'),AT(615,19,34,8),USE(?btnChooseBulkFile)
     END
     TEXT,AT(462,1,136,240),USE(?sciControl:Region),FONT(,,COLOR:BTNTEXT)
     BOX,AT(0,0,460,25),USE(?Application:Box),COLOR(COLOR:Red),FILL(0C0C0FFH), |
@@ -2802,14 +2809,33 @@ Looped BYTE
       END
     OF ?cmdSaveAll
       ThisWindow.Update()
-      !findStrOptions = SearchQueue
+      findStrOptions = SearchQueue
+      IF RECORDS(findStrOptions.ResultQueue) > 0
+      ELSE
+         MESSAGE('No search results to save.')
+         CYCLE
+      END 
+      IF LEN(CLIP(szBulkFile)) > 0
+         szSendToFilename = szBulkFile 
+      ELSE
+         MESSAGE('I need a file name')
+         SELECT(?szBulkFile)
+         CYCLE
+      END 
       IF SaveResultsAll(SearchQueue, szSendToFilename)
          !SendTo
          !POST(EVENT:Accepted,?cmdEdit)
          DO CheckEditor
       END
-    OF ?btnLoadAll
+    OF ?cmdLoadAll
        ThisWindow.Update()
+       IF LEN(CLIP(szBulkFile)) > 0
+          szSendToFilename = szBulkFile 
+       ELSE
+          MESSAGE('I need a file name')
+          SELECT(?szBulkFile)
+          CYCLE
+       END 
        
                 ! Loop
                   LastTabNumber += 1                  
