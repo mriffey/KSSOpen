@@ -28,7 +28,7 @@
  INCLUDE('csciviewer.inc'),ONCE
  INCLUDE('KSSGroups.clw'),ONCE
 
-CreateRestorePointAll   PROCEDURE  (tqSearchQueue pSearchQueue, *CSTRING szFilename) ! Declare Procedure'
+CreateRestorePointAll   PROCEDURE  (tqSearchQueue pSearchQueue, *CSTRING pRRLJFileName) ! Declare Procedure'
 intLoopCRPA LONG 
 !FindStrOptionsGroupType    GROUP,TYPE
 !tabNumber                     LONG
@@ -64,23 +64,40 @@ intLoopCRPA LONG
 !                           END
 pFindStrOptions GROUP(FindStrOptionsGroupType)
                 END
+qCRPA           QUEUE
+RestorePointFileName CSTRING(MAX_PATH),Name('RestorePointFileName')
+                END 
+intRC           LONG                
+oJSON           JSONClass
+oSTCRPA         StringTheory
+szFilenameRRLJ  CSTRING(MAX_PATH)
  CODE
- MESSAGE('Save all results ("this KSS session") to a file')
  
 ! for each tab
 ! set the resultQueue, then call with a generated szFilename
-  LOOP intLoopCRPA = 1 TO RECORDS(pSearchQueue)
-     GET(pSearchQueue, intLoopCRPA)
-     IF ERRORCODE()
-        MESSAGE(ERRORCODE())
-        BREAK
-     END 
-     pFindStrOptions = pSearchQueue
-     szFilename = 'CRPA' & intLoopCRPA & '.KSSRP'
-     CreateRestorePoint(pFindStrOptions, szFilename)
-  END 
-  
-  MESSAGE('Check *.KSSRP files') 
+ FREE(qCRPA)
+ LOOP intLoopCRPA = 1 TO RECORDS(pSearchQueue)
+    GET(pSearchQueue, intLoopCRPA)
+    IF ERRORCODE()
+       MESSAGE(ERRORCODE())
+       BREAK
+    END 
+    pFindStrOptions = pSearchQueue
+    szFilenameRRLJ = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\KSS_Results_tab_' & intLoopCRPA & '.rrl'
+    qCRPA.RestorePointFileName = szFilenameRRLJ
+    ADD(qCRPA)
+    intRC = CreateRestorePoint(pFindStrOptions, szFilenameRRLJ)
+    MESSAGE('CreateRestorePoint RC=' & intRC)
+ END 
+
+ szFilenameRRLJ = pRRLJFileName
+ oJSON.Start()
+ oJSON.SetTagCase(jf:CaseAsIs)
+ oJSON.SetDontSaveBlankArrayValues(true)
+ oJSON.Save(qCRPA,oSTCRPA,'restorepoints')
+ oSTCRPA.SaveFile(szFilenameRRLJ)  
+    
+ MESSAGE('Saved all search result tabs in ' & szFilenameRRLJ & '.')
 
  RETURN TRUE 
  
@@ -350,158 +367,158 @@ ImportData  ROUTINE
       END
 
 
-LoadRestorePointAll PROCEDURE (tqSearchQueue pSearchQueue, <*CSTRING szRestorePointFile>) ! Declare Procedure
-
-pResultQueue    &ResultQueueType
-pUndoQueue      &ResultQueueType
-saveTabNumber   LONG
-saveFeqProgress LONG
-lQueuePointer   LONG,AUTO
-lQueueRecords   LONG,AUTO
-ReturnValue     LONG(Level:Benign)
-sProgramName    STRING(8),AUTO
-sProcVersion    STRING('03')
-ulFilePointer   ULONG,AUTO
-ulLength        ULONG,AUTO
-szImpExFileName CSTRING(FILE:MaxFilePath),AUTO,STATIC,THREAD
-ImpExFile       FILE,DRIVER('DOS'),NAME(szImpExFileName),PRE(_DOS),CREATE,BINDABLE,THREAD
-Record              RECORD,PRE()
-ulRecordSize            ULONG
-FileByte                BYTE,DIM(32 * 1024)
-                    END
-                END
-oHH           &tagHTMLHelp
-pFindStrOptions GROUP(FindStrOptionsGroupType)
-                END 
+!LoadRestorePointAll PROCEDURE (tqSearchQueue pSearchQueue, <*CSTRING szRestorePointFile>) ! Declare Procedure
 !
-  CODE
-  
-  szImpExFileName = 'C:\projects\KSSOpen\source\bin\CRPA1.KSSRP'
-  DO ImportData
-  pSearchQueue = pFindStrOptions
-  ADD(pSearchQueue)  
-  szImpExFileName = 'C:\projects\KSSOpen\source\bin\CRPA2.KSSRP'  
-  DO ImportData
-  pSearchQueue = pFindStrOptions
-  ADD(pSearchQueue)
-  
-!    
-!      IF OMITTED(szRestorePointFile)
-!         szImpExFileName = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\KSS_Results.rrl'
-!         IF FILEDIALOG('Restore From ...',szImpExFileName,'Re-loadable Result List Files|*.RRL',BOR(FILE:KeepDir,FILE:LongName))
-!            DO ImportData
+!pResultQueue    &ResultQueueType
+!pUndoQueue      &ResultQueueType
+!saveTabNumber   LONG
+!saveFeqProgress LONG
+!lQueuePointer   LONG,AUTO
+!lQueueRecords   LONG,AUTO
+!ReturnValue     LONG(Level:Benign)
+!sProgramName    STRING(8),AUTO
+!sProcVersion    STRING('03')
+!ulFilePointer   ULONG,AUTO
+!ulLength        ULONG,AUTO
+!szImpExFileName CSTRING(FILE:MaxFilePath),AUTO,STATIC,THREAD
+!ImpExFile       FILE,DRIVER('DOS'),NAME(szImpExFileName),PRE(_DOS),CREATE,BINDABLE,THREAD
+!Record              RECORD,PRE()
+!ulRecordSize            ULONG
+!FileByte                BYTE,DIM(32 * 1024)
+!                    END
+!                END
+!oHH           &tagHTMLHelp
+!pFindStrOptions GROUP(FindStrOptionsGroupType)
+!                END 
+!!
+!  CODE
+!  
+!  szImpExFileName = 'C:\projects\KSSOpen\source\bin\CRPA1.KSSRP'
+!  DO ImportData
+!  pSearchQueue = pFindStrOptions
+!  ADD(pSearchQueue)  
+!  szImpExFileName = 'C:\projects\KSSOpen\source\bin\CRPA2.KSSRP'  
+!  DO ImportData
+!  pSearchQueue = pFindStrOptions
+!  ADD(pSearchQueue)
+!  
+!!    
+!!      IF OMITTED(szRestorePointFile)
+!!         szImpExFileName = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\KSS_Results.rrl'
+!!         IF FILEDIALOG('Restore From ...',szImpExFileName,'Re-loadable Result List Files|*.RRL',BOR(FILE:KeepDir,FILE:LongName))
+!!            DO ImportData
+!!         ELSE
+!!            ReturnValue = Level:User
+!!         END
+!!      ELSE
+!!         szImpExFileName = szRestorePointFile
+!!         DO ImportData
+!!      END
+!      RETURN ReturnValue
+!      
+!ImportData  ROUTINE
+!      OPEN(ImpExFile,ReadWrite+DenyAll)
+!      IF ~ERRORCODE()
+!         !Read Program Name Length
+!         ulFilePointer = 1
+!         GET(ImpExFile,ulFilePointer,4)
+!         ulFilePointer += 4
+!         ulLength = _DOS:ulRecordSize
+!         GET(ImpExFile,ulFilePointer,ulLength)
+!         ulFilePointer += ulLength
+!         kcr_MemCpy(ADDRESS(sProgramName),ADDRESS(_DOS:Record),ulLength)
+!         IF sProgramName = 'KSS'
+!            GET(ImpExFile,ulFilePointer,4)
+!            IF _DOS:ulRecordSize = 2
+!               ulFilePointer += 4
+!               ulLength = _DOS:ulRecordSize
+!               GET(ImpExFile,ulFilePointer,ulLength)
+!               ulFilePointer += ulLength
+!               kcr_MemCpy(ADDRESS(sProcVersion),ADDRESS(_DOS:Record),ulLength)
+!               IF sProcVersion <> '01'
+!                  !wrong verson
+!               END
+!            END
+!
+!            !Load FindStrOptions ---------------------------
+!            pResultQueue &= pFindStrOptions.ResultQueue
+!            pUndoQueue &= pFindStrOptions.UndoQueue
+!            saveTabNumber = pFindStrOptions.tabNumber
+!            saveFeqProgress = pFindStrOptions.feqSearchProgress
+!
+!            GET(ImpExFile,ulFilePointer,4)
+!            ulFilePointer += 4
+!            ulLength = _DOS:ulRecordSize
+!            GET(ImpExFile,ulFilePointer,ulLength)
+!            IF ~ERRORCODE()
+!               ulFilePointer += ulLength
+!               kcr_MemCpy(ADDRESS(pFindStrOptions),ADDRESS(_DOS:Record),ulLength)
+!               pFindStrOptions.ResultQueue &= pResultQueue
+!               pFindStrOptions.UndoQueue &= pUndoQueue
+!               pFindStrOptions.tabNumber = saveTabNumber
+!               pFindStrOptions.feqSearchProgress = saveFeqProgress
+!            ELSE
+!               !big problems
+!            END
+!
+!
+!            !Load ResultQueue ---------------------------
+!            GET(ImpExFile,ulFilePointer,4)
+!            IF ~ERRORCODE()
+!               ulFilePointer += 4
+!               kcr_MemCpy(ADDRESS(lQueueRecords),ADDRESS(_DOS:Record),4)
+!               FREE(pFindStrOptions.ResultQueue)
+!               LOOP lQueuePointer = 1 TO lQueueRecords
+!                 GET(ImpExFile,ulFilePointer,4)
+!                 IF ~ERRORCODE()
+!                    ulFilePointer += 4
+!                    ulLength = _DOS:ulRecordSize
+!                    GET(ImpExFile,ulFilePointer,ulLength)
+!                    IF ~ERRORCODE()
+!                       ulFilePointer += ulLength
+!                       kcr_MemCpy(ADDRESS(pFindStrOptions.ResultQueue),ADDRESS(_DOS:Record),ulLength)
+!                    END
+!                 END
+!                 IF ~ERRORCODE()
+!                    ADD(pFindStrOptions.ResultQueue)
+!                 ELSE
+!                    BREAK
+!                 END
+!               END
+!            END
+!
+!            !Load UndoQueue ---------------------------
+!            GET(ImpExFile,ulFilePointer,4)
+!            IF ~ERRORCODE()
+!               ulFilePointer += 4
+!               kcr_MemCpy(ADDRESS(lQueueRecords),ADDRESS(_DOS:Record),4)
+!               FREE(pFindStrOptions.UndoQueue)
+!               LOOP lQueuePointer = 1 TO lQueueRecords
+!                 GET(ImpExFile,ulFilePointer,4)
+!                 IF ~ERRORCODE()
+!                    ulFilePointer += 4
+!                    ulLength = _DOS:ulRecordSize
+!                    GET(ImpExFile,ulFilePointer,ulLength)
+!                    IF ~ERRORCODE()
+!                       ulFilePointer += ulLength
+!                       kcr_MemCpy(ADDRESS(pFindStrOptions.UndoQueue),ADDRESS(_DOS:Record),ulLength)
+!                    END
+!                 END
+!                 IF ~ERRORCODE()
+!                    ADD(pFindStrOptions.UndoQueue)
+!                 ELSE
+!                    BREAK
+!                 END
+!               END
+!            END
 !         ELSE
-!            ReturnValue = Level:User
+!            MESSAGE(szImpExFileName & ' Invalid File Type','Error - Load Aborted',ICON:Hand)
+!            ReturnValue = Level:Notify
 !         END
+!
+!         !Close the file
+!         CLOSE(ImpExFile)
 !      ELSE
-!         szImpExFileName = szRestorePointFile
-!         DO ImportData
+!         MESSAGE(szImpExFileName & ' [' & ERRORCODE() & '] ' & ERROR(),'Error - Load Aborted',ICON:Hand)
+!         ReturnValue = Level:Notify
 !      END
-      RETURN ReturnValue
-      
-ImportData  ROUTINE
-      OPEN(ImpExFile,ReadWrite+DenyAll)
-      IF ~ERRORCODE()
-         !Read Program Name Length
-         ulFilePointer = 1
-         GET(ImpExFile,ulFilePointer,4)
-         ulFilePointer += 4
-         ulLength = _DOS:ulRecordSize
-         GET(ImpExFile,ulFilePointer,ulLength)
-         ulFilePointer += ulLength
-         kcr_MemCpy(ADDRESS(sProgramName),ADDRESS(_DOS:Record),ulLength)
-         IF sProgramName = 'KSS'
-            GET(ImpExFile,ulFilePointer,4)
-            IF _DOS:ulRecordSize = 2
-               ulFilePointer += 4
-               ulLength = _DOS:ulRecordSize
-               GET(ImpExFile,ulFilePointer,ulLength)
-               ulFilePointer += ulLength
-               kcr_MemCpy(ADDRESS(sProcVersion),ADDRESS(_DOS:Record),ulLength)
-               IF sProcVersion <> '01'
-                  !wrong verson
-               END
-            END
-
-            !Load FindStrOptions ---------------------------
-            pResultQueue &= pFindStrOptions.ResultQueue
-            pUndoQueue &= pFindStrOptions.UndoQueue
-            saveTabNumber = pFindStrOptions.tabNumber
-            saveFeqProgress = pFindStrOptions.feqSearchProgress
-
-            GET(ImpExFile,ulFilePointer,4)
-            ulFilePointer += 4
-            ulLength = _DOS:ulRecordSize
-            GET(ImpExFile,ulFilePointer,ulLength)
-            IF ~ERRORCODE()
-               ulFilePointer += ulLength
-               kcr_MemCpy(ADDRESS(pFindStrOptions),ADDRESS(_DOS:Record),ulLength)
-               pFindStrOptions.ResultQueue &= pResultQueue
-               pFindStrOptions.UndoQueue &= pUndoQueue
-               pFindStrOptions.tabNumber = saveTabNumber
-               pFindStrOptions.feqSearchProgress = saveFeqProgress
-            ELSE
-               !big problems
-            END
-
-
-            !Load ResultQueue ---------------------------
-            GET(ImpExFile,ulFilePointer,4)
-            IF ~ERRORCODE()
-               ulFilePointer += 4
-               kcr_MemCpy(ADDRESS(lQueueRecords),ADDRESS(_DOS:Record),4)
-               FREE(pFindStrOptions.ResultQueue)
-               LOOP lQueuePointer = 1 TO lQueueRecords
-                 GET(ImpExFile,ulFilePointer,4)
-                 IF ~ERRORCODE()
-                    ulFilePointer += 4
-                    ulLength = _DOS:ulRecordSize
-                    GET(ImpExFile,ulFilePointer,ulLength)
-                    IF ~ERRORCODE()
-                       ulFilePointer += ulLength
-                       kcr_MemCpy(ADDRESS(pFindStrOptions.ResultQueue),ADDRESS(_DOS:Record),ulLength)
-                    END
-                 END
-                 IF ~ERRORCODE()
-                    ADD(pFindStrOptions.ResultQueue)
-                 ELSE
-                    BREAK
-                 END
-               END
-            END
-
-            !Load UndoQueue ---------------------------
-            GET(ImpExFile,ulFilePointer,4)
-            IF ~ERRORCODE()
-               ulFilePointer += 4
-               kcr_MemCpy(ADDRESS(lQueueRecords),ADDRESS(_DOS:Record),4)
-               FREE(pFindStrOptions.UndoQueue)
-               LOOP lQueuePointer = 1 TO lQueueRecords
-                 GET(ImpExFile,ulFilePointer,4)
-                 IF ~ERRORCODE()
-                    ulFilePointer += 4
-                    ulLength = _DOS:ulRecordSize
-                    GET(ImpExFile,ulFilePointer,ulLength)
-                    IF ~ERRORCODE()
-                       ulFilePointer += ulLength
-                       kcr_MemCpy(ADDRESS(pFindStrOptions.UndoQueue),ADDRESS(_DOS:Record),ulLength)
-                    END
-                 END
-                 IF ~ERRORCODE()
-                    ADD(pFindStrOptions.UndoQueue)
-                 ELSE
-                    BREAK
-                 END
-               END
-            END
-         ELSE
-            MESSAGE(szImpExFileName & ' Invalid File Type','Error - Load Aborted',ICON:Hand)
-            ReturnValue = Level:Notify
-         END
-
-         !Close the file
-         CLOSE(ImpExFile)
-      ELSE
-         MESSAGE(szImpExFileName & ' [' & ERRORCODE() & '] ' & ERROR(),'Error - Load Aborted',ICON:Hand)
-         ReturnValue = Level:Notify
-      END

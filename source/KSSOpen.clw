@@ -482,6 +482,7 @@ CtrlShiftBar   EQUATE(988)
    INCLUDE('ABFUZZY.INC'),ONCE
    INCLUDE('UltimateDebug.INC'),ONCE 
    INCLUDE('xfiles.inc'),ONCE
+   INCLUDE('jfiles.inc'),ONCE
    INCLUDE('reflection.inc'),ONCE 
    INCLUDE('StringTheory.Inc'),ONCE
 !    Include('WinEvent.Inc'),Once
@@ -578,7 +579,7 @@ ListBoxFormatter       FUNCTION(ListFormatQueueType pListFormatQueue),STRING   !
 CreateRestorePoint     FUNCTION(FindStrOptionsGroupType pFindStrOptions, *CSTRING szFilename),LONG,PROC   !
 CreateRestorePointAll  FUNCTION(tqSearchQueue pSearchQueue, *CSTRING szFilename),LONG,PROC 
 LoadRestorePoint       FUNCTION(FindStrOptionsGroupType pFindStrOptions, <*CSTRING szRestorePointFile>),LONG,PROC   !
-LoadRestorePointAll    FUNCTION(tqSearchQueue pSearchQueue, <*CSTRING szRestorePointFile>),LONG,PROC   !
+!LoadRestorePointAll    FUNCTION(tqSearchQueue pSearchQueue, <*CSTRING szRestorePointFile>),LONG,PROC   !
 
      END
      MODULE('KSSOpen-winShowMatchSummary.CLW')

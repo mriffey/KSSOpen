@@ -76,7 +76,7 @@ savePosition   LONG
 saveColWidth   LONG     !saved Location column width
 
 oST StringTheory 
-
+FileLookup2          SelectFileClass
 
 oHH           &tagHTMLHelp
 baseFontName            CSTRING('Verdana')
@@ -200,6 +200,7 @@ DeleteQueue             QUEUE,PRE(DQ)
 pointer                    LONG
                         END
 szBulkFile              CSTRING(MAX_PATH)
+intLoopCRPALoad         LONG 
 bTrackMouse             BOOL
 ViewerActive            BYTE
 ListWithFocus           LONG(34)  !-1)
@@ -248,6 +249,14 @@ szSearchPath         LIKE(szSearchPath)                    !
 FileMaskQueue        QUEUE,PRE(FileMaskQueue)              ! 
 szFileMask           LIKE(szFileMask)                      ! 
                      END                                   ! 
+                     
+qCRPALoad     Queue,Name('restorepoints')
+rpfilename      STRING(255),Name('RestorePointFileName')
+              End
+
+oJSONCRPALoad JSONClass 
+oSTCRPALoad   StringTheory                     
+                     
 Window WINDOW('KSSOpen (Hand code edition)'),AT(,,810,273),GRAY,IMM,SYSTEM,MAX, |
       ICON('kss.ico'),STATUS(-1,50,170,100),HLP('Main.htm'),FONT('Segoe UI',10,, |
       ,CHARSET:ANSI),TIMER(5),ALRT(988), ALRT(CtrlEnd), ALRT(CtrlHome), |
@@ -326,9 +335,6 @@ Window WINDOW('KSSOpen (Hand code edition)'),AT(,,810,273),GRAY,IMM,SYSTEM,MAX, 
           TIP('Reload saved tabs'),FLAT
       PROMPT('Save all'),AT(497,19),USE(?PROMPT1:10),TRN,FONT(,8),COLOR(0F2E4D7H)
       PROMPT('Load all'),AT(523,19),USE(?promptLoadAll),TRN,FONT(,8),COLOR(0F2E4D7H)
-      ENTRY(@s255),AT(653,18,151,9),USE(szBulkFile),FLAT,FONT(,10),COLOR(COLOR:White), |
-          TIP('File name for Save All / Load All')
-      BUTTON('"All" file'),AT(615,19,34,8),USE(?btnChooseBulkFile)
     END
     TEXT,AT(462,1,136,240),USE(?sciControl:Region),FONT(,,COLOR:BTNTEXT)
     BOX,AT(0,0,460,25),USE(?Application:Box),COLOR(COLOR:Red),FILL(0C0C0FFH), |
@@ -2815,95 +2821,63 @@ Looped BYTE
          MESSAGE('No search results to save.')
          CYCLE
       END 
-      IF LEN(CLIP(szBulkFile)) > 0
-         szSendToFilename = szBulkFile 
-      ELSE
-         MESSAGE('I need a file name')
-         SELECT(?szBulkFile)
-         CYCLE
-      END 
       IF SaveResultsAll(SearchQueue, szSendToFilename)
-         !SendTo
-         !POST(EVENT:Accepted,?cmdEdit)
          DO CheckEditor
       END
     OF ?cmdLoadAll
        ThisWindow.Update()
-       IF LEN(CLIP(szBulkFile)) > 0
-          szSendToFilename = szBulkFile 
-       ELSE
-          MESSAGE('I need a file name')
-          SELECT(?szBulkFile)
+       FileLookup2.SetMask('Re-loadable "Save All Tabs" Result List Files','*.json')                   ! Set the file mask
+       IF szBulkFile = ''
+          szBulkFile = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\KSS_Results_SaveAllTabs_*.json'           
+       END
+       FileLookup2.DefaultFile = szBulkFile
+       szBulkFile = FileLookup2.Ask(1)
+       IF szBulkFile <> ''
+       ELSE 
+          MESSAGE('No file name selected.')
           CYCLE
        END 
        
-                ! Loop
-                  LastTabNumber += 1                  
-                  DO SetTabFont
-                  NewTab{PROP:Text} = 'New Search'
-                  DO AddSearchQueueRecord
-                  SELECT(NewTab)
-                  NewTab = CREATE(0,CREATE:tab,?CurrentSearch)
-                  DO SetNewTabFont
-                  NewTab{PROP:Text} = NewSearchText
-                  NewTab{PROP:Hide} = FALSE
-               !END
+       oJSONCRPALoad.start()
+       oJSONCRPALoad.SetTagCase(jf:CaseAsIs)
+       oSTCRPALoad.LoadFile(szBulkFile)
+       oJSONCRPALoad.Load(qCRPALoad,oSTCRPALoad,'restorepoints') ! Load From a StringTheory object
+       LOOP intLoopCRPALoad = 1 TO RECORDS(qCRPALoad)
+          GET(qCRPALoad,intLoopCRPALoad)
+          szRRLFileName = qCRPALoad.rpfilename
+          LastTabNumber += 1                  
+          DO SetTabFont
+          NewTab{PROP:Text} = 'New Search'
+          DO AddSearchQueueRecord
+          SELECT(NewTab)
+          NewTab = CREATE(0,CREATE:tab,?CurrentSearch)
+          DO SetNewTabFont
+          NewTab{PROP:Text} = NewSearchText
+          NewTab{PROP:Hide} = FALSE
       
-               findStrOptions = SearchQueue
-               szRRLFileName = glo:RestorePointFolder & '\' & rrlQueue.name
-               szRRLFileName = 'C:\projects\KSSOpen\source\bin\CRPA1.KSSRP'
-               IF LoadRestorePoint(findStrOptions, szRRLFileName) = Level:Benign
-                  SearchQueue = findStrOptions
-                  SearchQueue.tabNumber = (?CurrentSearch{PROP:ChoiceFEQ})
-                  PUT(SearchQueue)
-                  (?CurrentSearch{PROP:ChoiceFEQ}){PROP:Text} = SearchQueue.szPattern
-                  ?ResultList{PROP:From} = SearchQueue.ResultQueue
-                  ?ResultList{PROP:Format} = SearchQueue.szListBoxFormat
-      
-                  AutoSizer.Reset(?ResultList,SearchQueue.ResultQueue)
-      
-                  HIDE(SearchQueue.feqSearchProgress)
-                  IF glo:bHideResultsPanel = FALSE
-                     UNHIDE(?szMatchesFound)
-                  END
-               END 
+          findStrOptions = SearchQueue
+          IF LoadRestorePoint(findStrOptions, szRRLFileName) = Level:Benign
+             SearchQueue = findStrOptions
+             SearchQueue.tabNumber = (?CurrentSearch{PROP:ChoiceFEQ})
+             PUT(SearchQueue)
+             (?CurrentSearch{PROP:ChoiceFEQ}){PROP:Text} = SearchQueue.szPattern
+             ?ResultList{PROP:From} = SearchQueue.ResultQueue
+             ?ResultList{PROP:Format} = SearchQueue.szListBoxFormat
+ 
+             AutoSizer.Reset(?ResultList,SearchQueue.ResultQueue)
+ 
+             HIDE(SearchQueue.feqSearchProgress)
+             IF glo:bHideResultsPanel = FALSE
+                UNHIDE(?szMatchesFound)
+             END
+          END               
+       END 
+       IF RECORDS(qCRPALoad) > 0
+          MESSAGE(RECORDS(qCRPALoad) & ' tabs restored.')
+       ELSE
+          MESSAGE('No saved tabs found in ' & szBulkFile)
+       END
 
-                ! Loop
-                  LastTabNumber += 1                  
-                  DO SetTabFont
-                  NewTab{PROP:Text} = 'New Search'
-                  DO AddSearchQueueRecord
-                  SELECT(NewTab)
-                  NewTab = CREATE(0,CREATE:tab,?CurrentSearch)
-                  DO SetNewTabFont
-                  NewTab{PROP:Text} = NewSearchText
-                  NewTab{PROP:Hide} = FALSE
-               !END
-      
-               findStrOptions = SearchQueue
-               szRRLFileName = glo:RestorePointFolder & '\' & rrlQueue.name
-               szRRLFileName = 'C:\projects\KSSOpen\source\bin\CRPA2.KSSRP'
-               IF LoadRestorePoint(findStrOptions, szRRLFileName) = Level:Benign
-                  SearchQueue = findStrOptions
-                  SearchQueue.tabNumber = (?CurrentSearch{PROP:ChoiceFEQ})
-                  PUT(SearchQueue)
-                  (?CurrentSearch{PROP:ChoiceFEQ}){PROP:Text} = SearchQueue.szPattern
-                  ?ResultList{PROP:From} = SearchQueue.ResultQueue
-                  ?ResultList{PROP:Format} = SearchQueue.szListBoxFormat
-      
-                  AutoSizer.Reset(?ResultList,SearchQueue.ResultQueue)
-      
-                  HIDE(SearchQueue.feqSearchProgress)
-                  IF glo:bHideResultsPanel = FALSE
-                     UNHIDE(?szMatchesFound)
-                  END
-               END                
-                  
-!       IF LoadRestorePointAll(SearchQueue, szSendToFilename)
-!          !SendTo
-!          !POST(EVENT:Accepted,?cmdEdit)
-!          DO CheckEditor
-!       END
     OF ?cmdEdit
       ThisWindow.Update()
       GET(SearchQueue.ResultQueue,CHOICE(?ResultList))

@@ -93,14 +93,14 @@ bSaveLocation        BYTE                                  !
 bSaveText            BYTE                                  ! 
 FormattedFilename    CSTRING(MAXPATH)
 Window WINDOW('Save All Session Results To A Reloadable Result File'), |
-      AT(,,470,168),CENTER,GRAY,SYSTEM,HLP('SaveResults.htm'),FONT('Segoe UI',10)
-    PANEL,AT(5,5,460,48),USE(?PANEL1),BEVEL(1)
+      AT(,,540,73),CENTER,GRAY,SYSTEM,HLP('SaveResults.htm'),FONT('Segoe UI',10)
+    PANEL,AT(5,5,533,48),USE(?PANEL1),BEVEL(1)
     PROMPT('Save to Filename'),AT(10,22),USE(?Filename:Prompt)
-    ENTRY(@s255),AT(72,22,354,10),USE(szTextFilename)
-    BUTTON('...'),AT(431,21,14,11),USE(?LookupFile:2)
-    CHECK(' Send To command after save'),AT(247,58),USE(bSendToAfterSave)
-    BUTTON('&Save'),AT(371,56,45,14),USE(?cmdSave)
-    BUTTON('&Cancel'),AT(420,56,45,14),USE(?cmdCancel)
+    ENTRY(@s255),AT(72,22,442,10),USE(szTextFilename)
+    BUTTON('...'),AT(518,21,14,11),USE(?LookupFile:2)
+    CHECK(' Send To command after save'),AT(247,58),USE(bSendToAfterSave),HIDE
+    BUTTON('&Save'),AT(444,56,45,14),USE(?cmdSave)
+    BUTTON('&Cancel'),AT(493,56,45,14),USE(?cmdCancel)
   END
 
     omit('***',WE::CantCloseNowSetHereDone=1)  !Getting Nested omit compile error, then uncheck the "Check for duplicate CantCloseNowSetHere variable declaration" in the WinEvent local template
@@ -193,7 +193,7 @@ ReturnValue          BYTE,AUTO
   INIMgr.Fetch('SaveResultsAll','ColumnDelimiter',ColumnDelimiter)
   INIMgr.Fetch('SaveResultsAll','FormatOption',FormatOption)
   INIMgr.Fetch('SaveResultsAll','bQuoteStrings',bQuoteStrings)
-  INIMgr.Fetch('SaveResultsAll','bSendToAfterSave',bSendToAfterSave)
+  INIMgr.Fetch('SaveResultsAll','bSendToAfterSave',bSendToAfterSave)  
   
   bSaveFilename = TRUE
   bSaveLineNumber = TRUE
@@ -209,7 +209,10 @@ ReturnValue          BYTE,AUTO
   FileLookup2.Flags=BOR(FileLookup2.Flags,FILE:LongName)   ! Allow long filenames
   FileLookup2.Flags=BOR(FileLookup2.Flags,FILE:Save)       ! Allow save Dialog
   FileLookup2.SetMask('All Files','*.*')                   ! Set the file mask
-  FileLookup2.DefaultFile='KSS_Results.txt'
+  
+  szTextFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\KSS_Results_SaveAllTabs_' |
+                 & YEAR(TODAY()) & FORMAT(MONTH(TODAY()),@N02) & FORMAT(DAY(TODAY()),@N02) & '_GiveItAMeaningfulName.json'
+  FileLookup2.DefaultFile = szTextFilename
   FileLookup2.WindowTitle='Save as ...'
   FileLookup2.Flags=BOR(FileLookup2.Flags,FILE:KeepDir)    ! Return to current folder
   SELF.SetAlerts()
@@ -279,25 +282,26 @@ Looped BYTE
     CASE ACCEPTED()
     OF ?LookupFile:2
       ThisWindow.Update()
-      CASE SaveTo
-        OF SaveToRestorePoint
-           FileLookup2.SetMask('Re-loadable Result List Files','*.RRL')                   ! Set the file mask
+!      CASE SaveTo
+!        OF SaveToRestorePoint
+           FileLookup2.SetMask('Re-loadable "Save All Tabs" Result List Files','*.json')                   ! Set the file mask
            IF szTextFilename = ''
-              szTextFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\KSS_Results.rrl'
+              szTextFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\KSS_Results_SaveAllTabs_' |
+                             & YEAR(TODAY()) & FORMAT(MONTH(TODAY()),@N02) & FORMAT(DAY(TODAY()),@N02) & '_NextTimeGiveItANickname.json'           
            END
            FileLookup2.DefaultFile = szTextFilename
-      ELSE
-           FileLookup2.SetMask('All Files','*.*')                   ! Set the file mask
-           IF szTextFilename = ''
-              szTextFilename = svSpecialFolder.GetDir(SV:CSIDL_PERSONAL) & '\KSS_Results.txt'
-           END
-           FileLookup2.DefaultFile = szTextFilename
-      END
+!      ELSE
+!           FileLookup2.SetMask('All Files','*.*')                   ! Set the file mask
+!           IF szTextFilename = ''
+!              szTextFilename = svSpecialFolder.GetDir(SV:CSIDL_PERSONAL) & '\KSS_Results.txt'
+!           END
+!           FileLookup2.DefaultFile = szTextFilename
+!      END
       szTextFilename = FileLookup2.Ask(1)
       DISPLAY
     OF ?cmdSave
       ThisWindow.Update()
-      INIMgr.Update('SaveResultsAll','SaveTo',SaveTo)
+      !INIMgr.Update('SaveResultsAll','SaveTo',SaveTo)
       INIMgr.Update('SaveResultsAll','szTextFilename',szTextFilename)
       INIMgr.Update('SaveResultsAll','ColumnDelimiter',ColumnDelimiter)
       INIMgr.Update('SaveResultsAll','FormatOption',FormatOption)
@@ -312,8 +316,8 @@ Looped BYTE
       ELSE
          IF SaveTo = SaveToRestorePoint
             cc = kcr_fnSplit(szTextFilename, szDrive, szDir, szName, szExtension)
-            IF UPPER(szExtension) <> '.RRL'
-               szTextFilename = szTextFilename & '.rrl'
+            IF UPPER(szExtension) <> '.json'
+               szTextFilename = szTextFilename & '.json'
             END
          END
          DO HandleSave
