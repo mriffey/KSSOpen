@@ -26,7 +26,7 @@
 !!! Generated from procedure template - Source
 !!! </summary>
 
-CreateRestorePointAll   PROCEDURE  (FindStrOptionsGroupType pFindStrOptions, *CSTRING szFilename) ! Declare Procedure'
+CreateRestorePointAll   PROCEDURE  (tqSearchQueue pSearchQueue, *CSTRING szFilename) ! Declare Procedure'
  CODE
  MESSAGE('Save all results ("this KSS session") to a file')
  

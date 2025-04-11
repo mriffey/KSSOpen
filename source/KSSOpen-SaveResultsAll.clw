@@ -30,7 +30,7 @@
 !!! <summary>
 !!! Generated from procedure template - Window
 !!! </summary>
-SaveResultsAll PROCEDURE (FindStrOptionsGroupType FindStrOptions, *CSTRING szSendToFilename)
+SaveResultsAll PROCEDURE (tqSearchQueue pSearchQueue, *CSTRING szSendToFilename)
 
 !region Notices
 ! ================================================================================
@@ -52,6 +52,40 @@ SaveResultsAll PROCEDURE (FindStrOptionsGroupType FindStrOptions, *CSTRING szSen
 !    along with Devuna-KwikSourceSearch.  If not, see <https://opensource.org/licenses/MIT>.
 ! ================================================================================
 !endregion Notices
+tqSearchQueue             QUEUE,TYPE
+tabNumber                  LONG
+bMatchPatternStartOfLine   BOOL
+bMatchPatternEndOfLine     BOOL
+bUseRegularExpressions     BOOL
+bSearchSubdirectories      BOOL
+nLevels                    BYTE
+nCurrentLevel              BYTE
+bCaseSensitive             BOOL
+bExactMatch                BOOL
+bExcludeMatch              BOOL
+bExcludeComments           BOOL
+!bIncludeBinary             BOOL
+bSearchPressed             BOOL
+szPattern                  CSTRING(1025)
+szSearchPath               CSTRING(1025)
+szFileMask                 CSTRING(256)
+szMatchesFound             CSTRING(256)
+ResultQueue                &ResultQueueType
+UndoQueue                  &ResultQueueType
+feqSearchProgress          LONG
+lPointer                   LONG
+bFilenamesOnly             BOOL
+bFileListFromFile          BOOL
+szFileListFilename         CSTRING(261)
+bSearchStringsFromFile     BOOL
+szSearchStringFilename     CSTRING(261)
+szPropertyFile             CSTRING(33)
+szExcludeMask              CSTRING(256)
+szListBoxFormat            CSTRING(256)
+FindGroup                  LIKE(FindGrp)
+szReplaceWith              LIKE(FindGrp.What)
+                        END
+                        
 oHH           &tagHTMLHelp
 SaveToClipboard               EQUATE(0)
 SaveToTextFile                EQUATE(1)
@@ -138,7 +172,8 @@ quotedText        &CSTRING
 
    CODE
 
-      CreateRestorePointAll(FindStrOptions,szTextFilename)
+
+      CreateRestorePointAll(pSearchQueue,szTextFilename)
 
       !ASSERT(0,eqDBG & 'DISPOSE szClipboardText [' & ADDRESS(szClipboardText) & ']')
       DISPOSE(szClipboardText)

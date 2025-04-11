@@ -2800,8 +2800,8 @@ Looped BYTE
       END
     OF ?cmdSaveAll
       ThisWindow.Update()
-      findStrOptions = SearchQueue
-      IF SaveResultsAll(findStrOptions, szSendToFilename)
+      !findStrOptions = SearchQueue
+      IF SaveResultsAll(SearchQueue, szSendToFilename)
          !SendTo
          !POST(EVENT:Accepted,?cmdEdit)
          DO CheckEditor
