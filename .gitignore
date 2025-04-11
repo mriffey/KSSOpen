@@ -6,3 +6,8 @@ setup/SetupKSSOpen.csv
 setup/SetupKSSOpen.exe
 setup/SetupKSSOpen.htm
 source/KSSOpen.sln.cache
+source/bin/KSSOpen.exe
+source/bin/msvcr70.dll
+source/bin/SciLexer.dll
+source/bin/VersionMe.exe
+source/bin/zlibwapi.dll
