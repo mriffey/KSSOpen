@@ -26,6 +26,8 @@
    INCLUDE('ABTOOLBA.INC'),ONCE
    INCLUDE('ABUTIL.INC'),ONCE
    INCLUDE('ABWINDOW.INC'),ONCE
+   INCLUDE('csciviewer.inc'),ONCE
+   INCLUDE('KSSGroups.clw'),ONCE
 
 !!! <summary>
 !!! Generated from procedure template - Window
@@ -52,39 +54,6 @@ SaveResultsAll PROCEDURE (tqSearchQueue pSearchQueue, *CSTRING szSendToFilename)
 !    along with Devuna-KwikSourceSearch.  If not, see <https://opensource.org/licenses/MIT>.
 ! ================================================================================
 !endregion Notices
-tqSearchQueue             QUEUE,TYPE
-tabNumber                  LONG
-bMatchPatternStartOfLine   BOOL
-bMatchPatternEndOfLine     BOOL
-bUseRegularExpressions     BOOL
-bSearchSubdirectories      BOOL
-nLevels                    BYTE
-nCurrentLevel              BYTE
-bCaseSensitive             BOOL
-bExactMatch                BOOL
-bExcludeMatch              BOOL
-bExcludeComments           BOOL
-!bIncludeBinary             BOOL
-bSearchPressed             BOOL
-szPattern                  CSTRING(1025)
-szSearchPath               CSTRING(1025)
-szFileMask                 CSTRING(256)
-szMatchesFound             CSTRING(256)
-ResultQueue                &ResultQueueType
-UndoQueue                  &ResultQueueType
-feqSearchProgress          LONG
-lPointer                   LONG
-bFilenamesOnly             BOOL
-bFileListFromFile          BOOL
-szFileListFilename         CSTRING(261)
-bSearchStringsFromFile     BOOL
-szSearchStringFilename     CSTRING(261)
-szPropertyFile             CSTRING(33)
-szExcludeMask              CSTRING(256)
-szListBoxFormat            CSTRING(256)
-FindGroup                  LIKE(FindGrp)
-szReplaceWith              LIKE(FindGrp.What)
-                        END
                         
 oHH           &tagHTMLHelp
 SaveToClipboard               EQUATE(0)
@@ -169,11 +138,11 @@ szLineNo          CSTRING(11)
 pBuffer           LONG
 buffSizeNeeded    LONG
 quotedText        &CSTRING
-
+intRC             LONG 
    CODE
 
 
-      CreateRestorePointAll(pSearchQueue,szTextFilename)
+      intRC = CreateRestorePointAll(pSearchQueue,szTextFilename)
 
       !ASSERT(0,eqDBG & 'DISPOSE szClipboardText [' & ADDRESS(szClipboardText) & ']')
       DISPOSE(szClipboardText)
@@ -193,7 +162,7 @@ ReturnValue          BYTE,AUTO
 
   CODE
     
-  GlobalErrors.SetProcedureName('SaveResults')
+  GlobalErrors.SetProcedureName('SaveResultsAll')
   SELF.Request = GlobalRequest                             ! Store the incoming request
   ReturnValue = PARENT.Init()
   IF ReturnValue THEN RETURN ReturnValue.
@@ -203,7 +172,7 @@ ReturnValue          BYTE,AUTO
   CLEAR(GlobalRequest)                                     ! Clear GlobalRequest after storing locally
   CLEAR(GlobalResponse)
   SELF.AddItem(Toolbar)
-  ResultQueue &= FindStrOptions.ResultQueue
+  ! ResultQueue &= FindStrOptions.ResultQueue
   SELF.Open(Window)                                        ! Open window
   !Setting the LineHeight for every control of type LIST/DROP or COMBO in the window using the global setting.
   Do DefineListboxStyle
@@ -216,25 +185,25 @@ ReturnValue          BYTE,AUTO
 !  WinAlertMouseZoom()
 !  WinAlert(WE::WM_QueryEndSession,,Return1+PostUser)
   Window{Prop:Alrt,255} = CtrlShiftP
-  INIMgr.Fetch('SaveResults',Window)                       ! Restore window settings from non-volatile store
+  INIMgr.Fetch('SaveResultsAll',Window)                       ! Restore window settings from non-volatile store
   CorrectForOffscreen(Window)
   
-  INIMgr.Fetch('SaveResults','SaveTo',SaveTo)
-  INIMgr.Fetch('SaveResults','szTextFilename',szTextFilename)
-  INIMgr.Fetch('SaveResults','ColumnDelimiter',ColumnDelimiter)
-  INIMgr.Fetch('SaveResults','FormatOption',FormatOption)
-  INIMgr.Fetch('SaveResults','bQuoteStrings',bQuoteStrings)
-  INIMgr.Fetch('SaveResults','bSendToAfterSave',bSendToAfterSave)
+  INIMgr.Fetch('SaveResultsAll','SaveTo',SaveTo)
+  INIMgr.Fetch('SaveResultsAll','szTextFilename',szTextFilename)
+  INIMgr.Fetch('SaveResultsAll','ColumnDelimiter',ColumnDelimiter)
+  INIMgr.Fetch('SaveResultsAll','FormatOption',FormatOption)
+  INIMgr.Fetch('SaveResultsAll','bQuoteStrings',bQuoteStrings)
+  INIMgr.Fetch('SaveResultsAll','bSendToAfterSave',bSendToAfterSave)
   
   bSaveFilename = TRUE
   bSaveLineNumber = TRUE
   bSaveLocation = TRUE
   bSaveText = TRUE
   
-  INIMgr.Fetch('SaveResults','bSaveFilename',bSaveFilename)
-  INIMgr.Fetch('SaveResults','bSaveLineNumber',bSaveLineNumber)
-  INIMgr.Fetch('SaveResults','bSaveLocation',bSaveLocation)
-  INIMgr.Fetch('SaveResults','bSaveText',bSaveText)
+  INIMgr.Fetch('SaveResultsAll','bSaveFilename',bSaveFilename)
+  INIMgr.Fetch('SaveResultsAll','bSaveLineNumber',bSaveLineNumber)
+  INIMgr.Fetch('SaveResultsAll','bSaveLocation',bSaveLocation)
+  INIMgr.Fetch('SaveResultsAll','bSaveText',bSaveText)
   FileLookup2.Init
   FileLookup2.ClearOnCancel = True
   FileLookup2.Flags=BOR(FileLookup2.Flags,FILE:LongName)   ! Allow long filenames
@@ -246,7 +215,7 @@ ReturnValue          BYTE,AUTO
   SELF.SetAlerts()
   oHH &= NEW tagHTMLHelp
   oHH.Init( 'kss.chm' )
-  oHH.SetTopic('SaveResults.htm')
+  oHH.SetTopic('SaveResultsAll.htm')
   !POST(EVENT:Accepted,?SaveTo)
   RETURN ReturnValue
 
@@ -260,7 +229,7 @@ ReturnValue          BYTE,AUTO
   ReturnValue = PARENT.Kill()
   IF ReturnValue THEN RETURN ReturnValue.
   IF SELF.Opened
-    INIMgr.Update('SaveResults',Window)                    ! Save window data to non-volatile store
+    INIMgr.Update('SaveResultsAll',Window)                    ! Save window data to non-volatile store
   END
   GlobalErrors.SetProcedureName
   IF ~oHH &= NULL
@@ -296,7 +265,7 @@ Looped BYTE
            bSendToAfterSave = FALSE
            FormatOption = FolderBasenameExtensionFormat
            IF szTextFilename = ''
-              INIMgr.Fetch('SaveResults','szTextFilename',szTextFilename)
+              INIMgr.Fetch('SaveResultsAll','szTextFilename',szTextFilename)
            END
            IF szTextFilename <> ''
               IF UPPER(szTextFilename[LEN(szTextFilename)-3 : LEN(szTextFilename)]) = '.TXT'
@@ -328,16 +297,16 @@ Looped BYTE
       DISPLAY
     OF ?cmdSave
       ThisWindow.Update()
-      INIMgr.Update('SaveResults','SaveTo',SaveTo)
-      INIMgr.Update('SaveResults','szTextFilename',szTextFilename)
-      INIMgr.Update('SaveResults','ColumnDelimiter',ColumnDelimiter)
-      INIMgr.Update('SaveResults','FormatOption',FormatOption)
-      INIMgr.Update('SaveResults','bQuoteStrings',bQuoteStrings)
-      INIMgr.Update('SaveResults','bSendToAfterSave',bSendToAfterSave)
-      INIMgr.Update('SaveResults','bSaveFilename',bSaveFilename)
-      INIMgr.Update('SaveResults','bSaveLineNumber',bSaveLineNumber)
-      INIMgr.Update('SaveResults','bSaveLocation',bSaveLocation)
-      INIMgr.Update('SaveResults','bSaveText',bSaveText)
+      INIMgr.Update('SaveResultsAll','SaveTo',SaveTo)
+      INIMgr.Update('SaveResultsAll','szTextFilename',szTextFilename)
+      INIMgr.Update('SaveResultsAll','ColumnDelimiter',ColumnDelimiter)
+      INIMgr.Update('SaveResultsAll','FormatOption',FormatOption)
+      INIMgr.Update('SaveResultsAll','bQuoteStrings',bQuoteStrings)
+      INIMgr.Update('SaveResultsAll','bSendToAfterSave',bSendToAfterSave)
+      INIMgr.Update('SaveResultsAll','bSaveFilename',bSaveFilename)
+      INIMgr.Update('SaveResultsAll','bSaveLineNumber',bSaveLineNumber)
+      INIMgr.Update('SaveResultsAll','bSaveLocation',bSaveLocation)
+      INIMgr.Update('SaveResultsAll','bSaveText',bSaveText)
       IF szTextFilename = ''
          SELECT(?szTextFilename)
       ELSE

@@ -83,6 +83,7 @@
     <FileDriver Include="ASCII" />
     <FileDriver Include="DOS" />
     <FileDriver Include="TOPSPEED" />
+    <None Include="KSSGroups.clw" />
     <Compile Include="KSSOpen-SaveResultsAll.clw" />
     <Compile Include="KSSOpen.clw">
       <Generated>true</Generated>

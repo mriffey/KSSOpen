@@ -24,12 +24,21 @@ StringTheory:TemplateVersion equate('3.38')
 !    along with Devuna-KwikSourceSearch.  If not, see <https://opensource.org/licenses/MIT>.
 ! ================================================================================
 !endregion Notices
+
+MAXPATH                          EQUATE(260)
+MAXDRIVE                         EQUATE(3)
+MAXDIR                          EQUATE(256)
+MAXFILE                          EQUATE(256)
+MAXEXT                          EQUATE(255)
+MAXMRU                           EQUATE(20)
+
    INCLUDE('ctKssKeyCodeName.inc'),ONCE
    INCLUDE('cwsynchc.inc'),ONCE
    INCLUDE('Windows.inc'),ONCE
    INCLUDE('svapi.inc'),ONCE
    INCLUDE('csciviewer.inc'),ONCE
-   INCLUDE('cwhh.inc'),ONCE
+   INCLUDE('KSSGroups.clw'),ONCE 
+   INCLUDE('cwhh.inc'),ONCE   
 INCLUDE('BRWEXT.INC'),ONCE
 !EQUATES
 HANDLE_FLAG_INHERIT              EQUATE(00000001h)
@@ -48,13 +57,6 @@ BUFSIZE                          EQUATE(10240)   !(16384)
 STD_INPUT_HANDLE                 EQUATE(-10)    !  The standard input device. Initially, this is the console input buffer, CONIN$.
 STD_OUTPUT_HANDLE                EQUATE(-11)    !  The standard output device. Initially, this is the active console screen buffer, CONOUT$.
 STD_ERROR_HANDLE                 EQUATE(-12)    !  The standard error device. Initially, this is the active console screen buffer, CONOUT$.
-
-MAXPATH                          EQUATE(260)
-MAXDRIVE                         EQUATE(3)
-MAXDIR                          EQUATE(256)
-MAXFILE                          EQUATE(256)
-MAXEXT                          EQUATE(255)
-MAXMRU                           EQUATE(20)
 
 BS_SOLID                         EQUATE(0)
 FLOODFILLSURFACE                 EQUATE(1)
@@ -222,94 +224,128 @@ hThread                 HANDLE
 dwProcessId             DWORD
 dwThreadId              DWORD
                      END
-SearchQueueType      QUEUE,TYPE
-tabNumber                  LONG
-bMatchPatternStartOfLine   BOOL
-bMatchPatternEndOfLine     BOOL
-bUseRegularExpressions     BOOL
-bSearchSubdirectories      BOOL
-nLevels                    BYTE
-nCurrentLevel              BYTE
-bCaseSensitive             BOOL
-bExactMatch                BOOL
-bExcludeMatch              BOOL
-bExcludeComments           BOOL
-!bIncludeBinary             BOOL
-bSearchPressed             BOOL
-szPattern                  CSTRING(1025)
-szSearchPath               CSTRING(1025)
-szFileMask                 CSTRING(256)
-szMatchesFound             CSTRING(256)
-ResultQueue                &ResultQueueType
-UndoQueue                  &ResultQueueType
-feqSearchProgress          LONG
-lPointer                   LONG
-bFilenamesOnly             BOOL
-bFileListFromFile          BOOL
-szFileListFilename         CSTRING(261)
-bSearchStringsFromFile     BOOL
-szSearchStringFilename     CSTRING(261)
-szPropertyFile             CSTRING(33)
-szExcludeMask              CSTRING(256)
-szListBoxFormat            CSTRING(256)
-FindGroup                  LIKE(FindGrp)
-szReplaceWith              LIKE(FindGrp.What)
-                     END 
-ResultQueueType      QUEUE,TYPE
-Path                   CSTRING(261)
-Filename               CSTRING(261)
-szExtension            CSTRING(MAXEXT+1)
-LineNo                 LONG
-ProcedureName          CSTRING(256)
-Text                   CSTRING(1025)
-SortName               CSTRING(261)
-szSection              CSTRING(5)
-Position               LONG
-DeleteInstance         LONG
-FileDate               LONG
-FileTime               LONG
-                     END
+!SearchQueueType      QUEUE,TYPE
+!tabNumber                  LONG
+!bMatchPatternStartOfLine   BOOL
+!bMatchPatternEndOfLine     BOOL
+!bUseRegularExpressions     BOOL
+!bSearchSubdirectories      BOOL
+!nLevels                    BYTE
+!nCurrentLevel              BYTE
+!bCaseSensitive             BOOL
+!bExactMatch                BOOL
+!bExcludeMatch              BOOL
+!bExcludeComments           BOOL
+!!bIncludeBinary             BOOL
+!bSearchPressed             BOOL
+!szPattern                  CSTRING(1025)
+!szSearchPath               CSTRING(1025)
+!szFileMask                 CSTRING(256)
+!szMatchesFound             CSTRING(256)
+!ResultQueue                &ResultQueueType
+!UndoQueue                  &ResultQueueType
+!feqSearchProgress          LONG
+!lPointer                   LONG
+!bFilenamesOnly             BOOL
+!bFileListFromFile          BOOL
+!szFileListFilename         CSTRING(261)
+!bSearchStringsFromFile     BOOL
+!szSearchStringFilename     CSTRING(261)
+!szPropertyFile             CSTRING(33)
+!szExcludeMask              CSTRING(256)
+!szListBoxFormat            CSTRING(256)
+!FindGroup                  LIKE(FindGrp)
+!szReplaceWith              LIKE(FindGrp.What)
+!                     END 
+!ResultQueueType      QUEUE,TYPE
+!Path                   CSTRING(261)
+!Filename               CSTRING(261)
+!szExtension            CSTRING(MAXEXT+1)
+!LineNo                 LONG
+!ProcedureName          CSTRING(256)
+!Text                   CSTRING(1025)
+!SortName               CSTRING(261)
+!szSection              CSTRING(5)
+!Position               LONG
+!DeleteInstance         LONG
+!FileDate               LONG
+!FileTime               LONG
+!                     END
 BookmarkQueueType    QUEUE,TYPE
 LineNo                  LONG
                      END
 STDOUTQueueType      QUEUE,TYPE
 Buffer                 STRING(BUFSIZE)
                      END
-FindStrOptionsGroupType    GROUP,TYPE
-tabNumber                     LONG
-bMatchPatternStartOfLine      BOOL
-bMatchPatternEndOfLine        BOOL
-bUseRegularExpressions        BOOL
-bSearchSubdirectories         BOOL
-nLevels                       BYTE
-nCurrentLevel                 BYTE
-bCaseSensitive                BOOL
-bExactMatch                   BOOL
-bExcludeMatch                 BOOL
-bExcludeComments              BOOL
-bSearchPressed                BOOL
-szPattern                     CSTRING(1025)
-szSearchPath                  CSTRING(1025)
-szFileMask                    CSTRING(256)
-szMatchesFound                CSTRING(256)
-ResultQueue                   &ResultQueueType
-UndoQueue                     &ResultQueueType
-feqSearchProgress             LONG
-lPointer                      LONG
-bFilenamesOnly                BOOL
-bFileListFromFile             BOOL
-szFileListFilename            CSTRING(261)
-bSearchStringsFromFile        BOOL
-szSearchStringFilename        CSTRING(261)
-szPropertyFile                CSTRING(33)
-szExcludeMask                 CSTRING(256)
-szListBoxFormat               CSTRING(256)
-FindGroup                     LIKE(FindGrp)
-szReplaceWith                 LIKE(FindGrp.What)
-                           END
+!FindStrOptionsGroupType    GROUP,TYPE
+!tabNumber                     LONG
+!bMatchPatternStartOfLine      BOOL
+!bMatchPatternEndOfLine        BOOL
+!bUseRegularExpressions        BOOL
+!bSearchSubdirectories         BOOL
+!nLevels                       BYTE
+!nCurrentLevel                 BYTE
+!bCaseSensitive                BOOL
+!bExactMatch                   BOOL
+!bExcludeMatch                 BOOL
+!bExcludeComments              BOOL
+!bSearchPressed                BOOL
+!szPattern                     CSTRING(1025)
+!szSearchPath                  CSTRING(1025)
+!szFileMask                    CSTRING(256)
+!szMatchesFound                CSTRING(256)
+!ResultQueue                   &ResultQueueType
+!UndoQueue                     &ResultQueueType
+!feqSearchProgress             LONG
+!lPointer                      LONG
+!bFilenamesOnly                BOOL
+!bFileListFromFile             BOOL
+!szFileListFilename            CSTRING(261)
+!bSearchStringsFromFile        BOOL
+!szSearchStringFilename        CSTRING(261)
+!szPropertyFile                CSTRING(33)
+!szExcludeMask                 CSTRING(256)
+!szListBoxFormat               CSTRING(256)
+!FindGroup                     LIKE(FindGrp)
+!szReplaceWith                 LIKE(FindGrp.What)
+!                           END
 FindTextQueueType             QUEUE,TYPE
 szFindText                       CSTRING(256)
                               END
+                              
+!tqSearchQueue             QUEUE,TYPE
+!tabNumber                  LONG
+!bMatchPatternStartOfLine   BOOL
+!bMatchPatternEndOfLine     BOOL
+!bUseRegularExpressions     BOOL
+!bSearchSubdirectories      BOOL
+!nLevels                    BYTE
+!nCurrentLevel              BYTE
+!bCaseSensitive             BOOL
+!bExactMatch                BOOL
+!bExcludeMatch              BOOL
+!bExcludeComments           BOOL
+!!bIncludeBinary             BOOL
+!bSearchPressed             BOOL
+!szPattern                  CSTRING(1025)
+!szSearchPath               CSTRING(1025)
+!szFileMask                 CSTRING(256)
+!szMatchesFound             CSTRING(256)
+!ResultQueue                &ResultQueueType
+!UndoQueue                  &ResultQueueType
+!feqSearchProgress          LONG
+!lPointer                   LONG
+!bFilenamesOnly             BOOL
+!bFileListFromFile          BOOL
+!szFileListFilename         CSTRING(261)
+!bSearchStringsFromFile     BOOL
+!szSearchStringFilename     CSTRING(261)
+!szPropertyFile             CSTRING(33)
+!szExcludeMask              CSTRING(256)
+!szListBoxFormat            CSTRING(256)
+!FindGroup                  LIKE(FindGrp)
+!szReplaceWith              LIKE(FindGrp.What)
+!                        END                              
 
 SearchFindOptionsGroupType    GROUP,TYPE
 szFindText                       CSTRING(256)
@@ -376,6 +412,7 @@ lowLineNo            LONG
 highLineNo           LONG
 szSection            CSTRING(5)
                   END
+                                    
 OSVERSIONINFO          GROUP,TYPE
 dwOSVersionInfoSize      DWORD
 dwMajorVersion           DWORD
@@ -513,7 +550,8 @@ GetCommentStyle        FUNCTION(*CSTRING szExtension),LONG   !
 SaveResults            FUNCTION(FindStrOptionsGroupType FindStrOptions, *CSTRING szSendToFilename),BOOL   !
      END
      MODULE('KSSOpen-SaveResultsAll.CLW')
-SaveResultsAll         FUNCTION(FindStrOptionsGroupType FindStrOptions, *CSTRING szSendToFilename),BOOL   !
+!SaveResultsAll         FUNCTION(FindStrOptionsGroupType FindStrOptions, *CSTRING szSendToFilename),BOOL   !
+SaveResultsAll         PROCEDURE (tqSearchQueue pSearchQueue, *CSTRING szSendToFilename),BOOL
      END
      MODULE('KSSOpen-MRUContextMenu.CLW')
 MRUContextMenu         PROCEDURE( MRUQueueType MRUQueue, LONG feqControl, STRING strDefault)   !
@@ -538,8 +576,10 @@ ListBoxFormatter       FUNCTION(ListFormatQueueType pListFormatQueue),STRING   !
      END
      MODULE('KSSOpen-RestorePointIO.CLW')
 CreateRestorePoint     FUNCTION(FindStrOptionsGroupType pFindStrOptions, *CSTRING szFilename),LONG,PROC   !
-CreateRestorePointAll  FUNCTION(FindStrOptionsGroupType pFindStrOptions, *CSTRING szFilename),LONG,PROC 
+CreateRestorePointAll  FUNCTION(tqSearchQueue pSearchQueue, *CSTRING szFilename),LONG,PROC 
 LoadRestorePoint       FUNCTION(FindStrOptionsGroupType pFindStrOptions, <*CSTRING szRestorePointFile>),LONG,PROC   !
+LoadRestorePointAll    FUNCTION(tqSearchQueue pSearchQueue, <*CSTRING szRestorePointFile>),LONG,PROC   !
+
      END
      MODULE('KSSOpen-winShowMatchSummary.CLW')
 winShowMatchSummary    FUNCTION(ResultQueueType ResultQueue, ResultQueueType UndoQueue, BOOL bCaseSensitive, BOOL bRegularExpression, *CSTRING szPattern),STRING   !

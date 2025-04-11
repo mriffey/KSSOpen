@@ -27,6 +27,7 @@
    INCLUDE('ABTOOLBA.INC'),ONCE
    INCLUDE('ABWINDOW.INC'),ONCE
    INCLUDE('csciviewer.inc'),ONCE
+   INCLUDE('KSSGroups.clw'),ONCE
 
    MAP
 BookmarkAdd             PROCEDURE(LONG lineno)              ! New method added to this class instance
@@ -320,6 +321,7 @@ Window WINDOW('KSSOpen (Hand code edition)'),AT(,,810,273),GRAY,IMM,SYSTEM,MAX, 
       PANEL,AT(531,3,1,12),USE(?Separator4:3),BEVEL(1)
       BUTTON,AT(498,2,18,14),USE(?cmdSaveAll),COLOR(0F2E4D7H),ICON('FileSaveAll.ico'), |
           TIP('Save Results ...'),FLAT
+      BUTTON('Load All Search Tabs'),AT(498,19,,9),USE(?btnLoadAll),FONT(,9)
     END
     TEXT,AT(462,1,136,240),USE(?sciControl:Region),FONT(,,COLOR:BTNTEXT)
     BOX,AT(0,0,460,25),USE(?Application:Box),COLOR(COLOR:Red),FILL(0C0C0FFH), |
@@ -2806,6 +2808,76 @@ Looped BYTE
          !POST(EVENT:Accepted,?cmdEdit)
          DO CheckEditor
       END
+    OF ?btnLoadAll
+       ThisWindow.Update()
+       
+                ! Loop
+                  LastTabNumber += 1                  
+                  DO SetTabFont
+                  NewTab{PROP:Text} = 'New Search'
+                  DO AddSearchQueueRecord
+                  SELECT(NewTab)
+                  NewTab = CREATE(0,CREATE:tab,?CurrentSearch)
+                  DO SetNewTabFont
+                  NewTab{PROP:Text} = NewSearchText
+                  NewTab{PROP:Hide} = FALSE
+               !END
+      
+               findStrOptions = SearchQueue
+               szRRLFileName = glo:RestorePointFolder & '\' & rrlQueue.name
+               szRRLFileName = 'C:\projects\KSSOpen\source\bin\CRPA1.KSSRP'
+               IF LoadRestorePoint(findStrOptions, szRRLFileName) = Level:Benign
+                  SearchQueue = findStrOptions
+                  SearchQueue.tabNumber = (?CurrentSearch{PROP:ChoiceFEQ})
+                  PUT(SearchQueue)
+                  (?CurrentSearch{PROP:ChoiceFEQ}){PROP:Text} = SearchQueue.szPattern
+                  ?ResultList{PROP:From} = SearchQueue.ResultQueue
+                  ?ResultList{PROP:Format} = SearchQueue.szListBoxFormat
+      
+                  AutoSizer.Reset(?ResultList,SearchQueue.ResultQueue)
+      
+                  HIDE(SearchQueue.feqSearchProgress)
+                  IF glo:bHideResultsPanel = FALSE
+                     UNHIDE(?szMatchesFound)
+                  END
+               END 
+
+                ! Loop
+                  LastTabNumber += 1                  
+                  DO SetTabFont
+                  NewTab{PROP:Text} = 'New Search'
+                  DO AddSearchQueueRecord
+                  SELECT(NewTab)
+                  NewTab = CREATE(0,CREATE:tab,?CurrentSearch)
+                  DO SetNewTabFont
+                  NewTab{PROP:Text} = NewSearchText
+                  NewTab{PROP:Hide} = FALSE
+               !END
+      
+               findStrOptions = SearchQueue
+               szRRLFileName = glo:RestorePointFolder & '\' & rrlQueue.name
+               szRRLFileName = 'C:\projects\KSSOpen\source\bin\CRPA2.KSSRP'
+               IF LoadRestorePoint(findStrOptions, szRRLFileName) = Level:Benign
+                  SearchQueue = findStrOptions
+                  SearchQueue.tabNumber = (?CurrentSearch{PROP:ChoiceFEQ})
+                  PUT(SearchQueue)
+                  (?CurrentSearch{PROP:ChoiceFEQ}){PROP:Text} = SearchQueue.szPattern
+                  ?ResultList{PROP:From} = SearchQueue.ResultQueue
+                  ?ResultList{PROP:Format} = SearchQueue.szListBoxFormat
+      
+                  AutoSizer.Reset(?ResultList,SearchQueue.ResultQueue)
+      
+                  HIDE(SearchQueue.feqSearchProgress)
+                  IF glo:bHideResultsPanel = FALSE
+                     UNHIDE(?szMatchesFound)
+                  END
+               END                
+                  
+!       IF LoadRestorePointAll(SearchQueue, szSendToFilename)
+!          !SendTo
+!          !POST(EVENT:Accepted,?cmdEdit)
+!          DO CheckEditor
+!       END
     OF ?cmdEdit
       ThisWindow.Update()
       GET(SearchQueue.ResultQueue,CHOICE(?ResultList))
