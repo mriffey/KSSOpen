@@ -32,7 +32,7 @@
 !!! <summary>
 !!! Generated from procedure template - Window
 !!! </summary>
-SaveResultsAll PROCEDURE (tqSearchQueue pSearchQueue, *CSTRING szSendToFilename)
+SaveResultsAll PROCEDURE (tqSearchQueue pSearchQueue)
 
 !region Notices
 ! ================================================================================
@@ -188,7 +188,6 @@ ReturnValue          BYTE,AUTO
   INIMgr.Fetch('SaveResultsAll',Window)                       ! Restore window settings from non-volatile store
   CorrectForOffscreen(Window)
   
-  INIMgr.Fetch('SaveResultsAll','SaveTo',SaveTo)
   INIMgr.Fetch('SaveResultsAll','szTextFilename',szTextFilename)
   INIMgr.Fetch('SaveResultsAll','ColumnDelimiter',ColumnDelimiter)
   INIMgr.Fetch('SaveResultsAll','FormatOption',FormatOption)
@@ -282,26 +281,16 @@ Looped BYTE
     CASE ACCEPTED()
     OF ?LookupFile:2
       ThisWindow.Update()
-!      CASE SaveTo
-!        OF SaveToRestorePoint
-           FileLookup2.SetMask('Re-loadable "Save All Tabs" Result List Files','*.json')                   ! Set the file mask
-           IF szTextFilename = ''
-              szTextFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\KSS_Results_SaveAllTabs_' |
-                             & YEAR(TODAY()) & FORMAT(MONTH(TODAY()),@N02) & FORMAT(DAY(TODAY()),@N02) & '_NextTimeGiveItANickname.json'           
-           END
-           FileLookup2.DefaultFile = szTextFilename
-!      ELSE
-!           FileLookup2.SetMask('All Files','*.*')                   ! Set the file mask
-!           IF szTextFilename = ''
-!              szTextFilename = svSpecialFolder.GetDir(SV:CSIDL_PERSONAL) & '\KSS_Results.txt'
-!           END
-!           FileLookup2.DefaultFile = szTextFilename
-!      END
+      FileLookup2.SetMask('Re-loadable "Save All Tabs" Result List Files','*.json')                   ! Set the file mask
+      IF szTextFilename = ''
+         szTextFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\KSS_Results_SaveAllTabs_' |
+                        & YEAR(TODAY()) & FORMAT(MONTH(TODAY()),@N02) & FORMAT(DAY(TODAY()),@N02) & '_NextTimeGiveItANickname.json'
+      END
+      FileLookup2.DefaultFile = szTextFilename
       szTextFilename = FileLookup2.Ask(1)
       DISPLAY
     OF ?cmdSave
       ThisWindow.Update()
-      !INIMgr.Update('SaveResultsAll','SaveTo',SaveTo)
       INIMgr.Update('SaveResultsAll','szTextFilename',szTextFilename)
       INIMgr.Update('SaveResultsAll','ColumnDelimiter',ColumnDelimiter)
       INIMgr.Update('SaveResultsAll','FormatOption',FormatOption)
@@ -316,7 +305,7 @@ Looped BYTE
       ELSE
          IF SaveTo = SaveToRestorePoint
             cc = kcr_fnSplit(szTextFilename, szDrive, szDir, szName, szExtension)
-            IF UPPER(szExtension) <> '.json'
+            IF UPPER(szExtension) <> '.JSON'
                szTextFilename = szTextFilename & '.json'
             END
          END

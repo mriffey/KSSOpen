@@ -66,40 +66,47 @@ pFindStrOptions GROUP(FindStrOptionsGroupType)
                 END
 qCRPA           QUEUE
 RestorePointFileName CSTRING(MAX_PATH),Name('RestorePointFileName')
-                END 
-intRC           LONG                
+                END
+intRC           LONG
 oJSON           JSONClass
 oSTCRPA         StringTheory
 szFilenameRRLJ  CSTRING(MAX_PATH)
+szDrive         CSTRING(MAXDRIVE+1)
+szDir           CSTRING(MAXDIR+1)
+szName          CSTRING(MAXFILE+1)
+szExtension     CSTRING(MAXEXT+1)
+cc              LONG
+szRRLBase       CSTRING(MAX_PATH)
  CODE
- 
-! for each tab
-! set the resultQueue, then call with a generated szFilename
+
+! Derive the per-tab .rrl filename prefix from the JSON filename so each
+! saved session gets its own set of payload files and later saves don't
+! overwrite earlier ones.
+ cc = kcr_fnSplit(pRRLJFileName, szDrive, szDir, szName, szExtension)
+ szRRLBase = szDrive & szDir & szName
+
  FREE(qCRPA)
  LOOP intLoopCRPA = 1 TO RECORDS(pSearchQueue)
     GET(pSearchQueue, intLoopCRPA)
     IF ERRORCODE()
        MESSAGE('Errorcode ' & ERRORCODE() & ' getting search queue')
        BREAK
-    END 
+    END
     pFindStrOptions = pSearchQueue
-    szFilenameRRLJ = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\KSS_Results_tab_' & intLoopCRPA & '.rrl'
+    szFilenameRRLJ = szRRLBase & '_tab_' & intLoopCRPA & '.rrl'
     qCRPA.RestorePointFileName = szFilenameRRLJ
     ADD(qCRPA)
     intRC = CreateRestorePoint(pFindStrOptions, szFilenameRRLJ)
-    !MESSAGE('CreateRestorePoint RC=' & intRC)
- END 
+ END
 
  szFilenameRRLJ = pRRLJFileName
  oJSON.Start()
  oJSON.SetTagCase(jf:CaseAsIs)
  oJSON.SetDontSaveBlankArrayValues(true)
  oJSON.Save(qCRPA,oSTCRPA,'restorepoints')
- oSTCRPA.SaveFile(szFilenameRRLJ)  
-    
- MESSAGE('Saved all search result tabs in ' & szFilenameRRLJ & '.')
+ oSTCRPA.SaveFile(szFilenameRRLJ)
 
- RETURN TRUE 
+ RETURN TRUE
  
 
 CreateRestorePoint   PROCEDURE  (FindStrOptionsGroupType pFindStrOptions, *CSTRING szFilename) ! Declare Procedure

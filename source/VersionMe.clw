@@ -1,1 +1,1 @@
-glo:szVersion        CSTRING('2025.4.11.90')
+glo:szVersion        CSTRING('2026.5.8.92')

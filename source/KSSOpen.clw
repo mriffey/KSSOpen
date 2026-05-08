@@ -551,8 +551,7 @@ GetCommentStyle        FUNCTION(*CSTRING szExtension),LONG   !
 SaveResults            FUNCTION(FindStrOptionsGroupType FindStrOptions, *CSTRING szSendToFilename),BOOL   !
      END
      MODULE('KSSOpen-SaveResultsAll.CLW')
-!SaveResultsAll         FUNCTION(FindStrOptionsGroupType FindStrOptions, *CSTRING szSendToFilename),BOOL   !
-SaveResultsAll         PROCEDURE (tqSearchQueue pSearchQueue, *CSTRING szSendToFilename),BOOL
+SaveResultsAll         PROCEDURE (tqSearchQueue pSearchQueue),BOOL
      END
      MODULE('KSSOpen-MRUContextMenu.CLW')
 MRUContextMenu         PROCEDURE( MRUQueueType MRUQueue, LONG feqControl, STRING strDefault)   !
@@ -579,7 +578,6 @@ ListBoxFormatter       FUNCTION(ListFormatQueueType pListFormatQueue),STRING   !
 CreateRestorePoint     FUNCTION(FindStrOptionsGroupType pFindStrOptions, *CSTRING szFilename),LONG,PROC   !
 CreateRestorePointAll  FUNCTION(tqSearchQueue pSearchQueue, *CSTRING szFilename),LONG,PROC 
 LoadRestorePoint       FUNCTION(FindStrOptionsGroupType pFindStrOptions, <*CSTRING szRestorePointFile>),LONG,PROC   !
-!LoadRestorePointAll    FUNCTION(tqSearchQueue pSearchQueue, <*CSTRING szRestorePointFile>),LONG,PROC   !
 
      END
      MODULE('KSSOpen-winShowMatchSummary.CLW')

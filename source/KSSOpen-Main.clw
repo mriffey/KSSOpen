@@ -619,7 +619,7 @@ LocationColWidth  LONG
       INIMgr.Update('Search Options','bExcludeComments',SearchQueue.bExcludeComments)
       !INIMgr.Update('Search Options','bIncludeBinary',SearchQueue.bIncludeBinary)
 
-      ReplaceChr(SearchQueue.szPattern,'''','§')
+      ReplaceChr(SearchQueue.szPattern,'''','ï¿½')
       !ReplaceChr(SearchQueue.szPattern,'''','<A7h>')  ! MR 20190217 avoid losing this important hex char to random translation. 
       INIMgr.Update('Search Options','szPattern',SearchQueue.szPattern)
 
@@ -2199,7 +2199,7 @@ MONITOR_DEFAULTTOPRIMARY   EQUATE(00000001h)
   INIMgr.Fetch('Search Options','bExcludeComments',bExcludeComments)
   
   INIMgr.Fetch('Search Options','szPattern',szPattern)
-  ReplaceChr(szPattern,'§','''')
+  ReplaceChr(szPattern,'ï¿½','''')
   !ReplaceChr(szPattern,'<A7h>','''')
   
   INIMgr.Fetch('Search Options','szSearchPath',szSearchPath)
@@ -2821,7 +2821,7 @@ Looped BYTE
          MESSAGE('No search results to save.')
          CYCLE
       END 
-      IF SaveResultsAll(SearchQueue, szSendToFilename)
+      IF SaveResultsAll(SearchQueue)
          DO CheckEditor
       END
     OF ?cmdLoadAll
