@@ -1,6 +1,5 @@
 ﻿<File_List name="KSSOpen.cwproj" version="1">
   <Opened_Files>
-    <file name="BIN\\KSSOPEN.EXE" />
     <file name="C:\CLARION11\ACCESSORY\LIB\PSAPI.LIB" />
     <file name="C:\CLARION11\ACCESSORY\LIBSRC\WIN\CSCICONTROL.CLW" />
     <file name="C:\CLARION11\ACCESSORY\LIBSRC\WIN\CSCICONTROL.INC" />
@@ -328,7 +327,15 @@
   </Opened_Files>
   <Created_Files>
     <file name="BIN\\KSSOPEN.EXE" />
+    <file name="C:\PROJECTS\KSSOPEN\SOURCE\BIN\CLAASC.DLL" />
+    <file name="C:\PROJECTS\KSSOPEN\SOURCE\BIN\CLADOS.DLL" />
+    <file name="C:\PROJECTS\KSSOPEN\SOURCE\BIN\CLAOLE.DLL" />
+    <file name="C:\PROJECTS\KSSOPEN\SOURCE\BIN\CLARUN.DLL" />
+    <file name="C:\PROJECTS\KSSOPEN\SOURCE\BIN\CLATPS.DLL" />
+    <file name="C:\PROJECTS\KSSOPEN\SOURCE\BIN\CWHHLA.DLL" />
+    <file name="C:\PROJECTS\KSSOPEN\SOURCE\BIN\ZLIBWAPI.DLL" />
     <file name="C:\PROJECTS\KSSOPEN\SOURCE\KSSOPEN.LIB" />
+    <file name="C:\PROJECTS\KSSOPEN\SOURCE\MAP\DEBUG\KSSOPEN.MAP" />
     <file name="C:\PROJECTS\KSSOPEN\SOURCE\OBJ\DEBUG\ABBREAK.OBJ" />
     <file name="C:\PROJECTS\KSSOPEN\SOURCE\OBJ\DEBUG\ABBROWSE.OBJ" />
     <file name="C:\PROJECTS\KSSOPEN\SOURCE\OBJ\DEBUG\ABEIP.OBJ" />
@@ -423,6 +430,9 @@
     <file name="C:\PROJECTS\KSSOPEN\SOURCE\OBJ\DEBUG\ULTIMATEDEBUG.RSC" />
     <file name="C:\PROJECTS\KSSOPEN\SOURCE\OBJ\DEBUG\XFILES.OBJ" />
   </Created_Files>
+  <NotFound_Files>
+    <file name="BIN\\KSSOPEN.EXE" />
+  </NotFound_Files>
   <ToCopy_Files>
     <file name="CLAASC.DLL" />
     <file name="CLADOS.DLL" />
