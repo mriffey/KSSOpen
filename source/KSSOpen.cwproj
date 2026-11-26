@@ -185,10 +185,13 @@
     </None>
   </ItemGroup>
   <Import Project="$(ClarionBinPath)\SoftVelocity.Build.Clarion.targets" />
-  <!-- The pre-build step runs with OutputPath as its working directory, which does not exist in a fresh
-       clone for Release (bin\release\ is not tracked), so the build failed with MSB6003. Create it first. -->
-  <Target Name="KssCreateOutputPath" BeforeTargets="PreBuildEvent">
-    <MakeDir Directories="$(OutputPath)" Condition="!Exists('$(OutputPath)')" />
+  <!-- Replaces the PreBuildEvent target from SoftVelocity.Build.Clarion.targets (the last definition of a
+       target wins, in every MSBuild version the Clarion IDE may use). The original runs the pre-build step
+       with OutputPath as its working directory, and Release's bin\release\ does not exist in a fresh clone
+       (it is not tracked), so the build stopped with MSB6003. Create the folder first and use a full path. -->
+  <Target Name="PreBuildEvent" Condition="'$(PreBuildEvent)'!=''" DependsOnTargets="$(PreBuildEventDependsOn)">
+    <MakeDir Directories="$(MSBuildProjectDirectory)\$(OutputPath)" Condition="!Exists('$(MSBuildProjectDirectory)\$(OutputPath)')" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)\$(OutputPath)" Command="$(PreBuildEvent)" />
   </Target>
   <PropertyGroup>
     <PreBuildEvent>$(SolutionDir)bin\VersionMe.exe PROJECT=$(OutputName) BINARYTYPE=$(OutputType) APPFOLDER=$(SolutionDir)</PreBuildEvent>
