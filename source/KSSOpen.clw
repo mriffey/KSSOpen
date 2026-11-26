@@ -647,6 +647,7 @@ ThreadNo               LONG
 TargetProcessHandle    LONG
 tabNumber              LONG
 lClock                 LONG
+Options                &STRING                   ! START parameter for FindStr; disposed when the thread posts EVENT:THREAD
                      END
 STDOUT_Queue         QUEUE(STDOUTQueueType),PRE(SQ),THREAD
                      END

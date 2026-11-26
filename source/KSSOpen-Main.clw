@@ -2578,6 +2578,7 @@ Looped BYTE
             ThreadQueue.tabNumber = SearchQueue.tabNumber
             ThreadQueue.ThreadNo = 0
             ThreadQueue.TargetProcessHandle = kcr_GetCurrentProcess()
+            ThreadQueue.Options &= strOptions     ! keep the START parameter alive until the thread has finished
             ADD(ThreadQueue,+ThreadQueue.tabNumber)
             cs.release()
       
@@ -2592,8 +2593,9 @@ Looped BYTE
                PUT(ClockQueue)
             END
       
-            !ASSERT(0,eqDBG & 'DISPOSE FindStrOptions [' & ADDRESS(strOptions) &']')
-            DISPOSE(strOptions)
+            ! strOptions is not disposed here: with the Clarion 12 runtime the new thread may not have
+            ! copied its START parameter yet. It is disposed via ThreadQueue.Options in TakeEvent when the
+            ! search thread posts EVENT:THREAD.
             strOptions &= NULL
             ShowWaitCursor = TRUE
             SETCURSOR(CURSOR:Wait)
@@ -2983,6 +2985,10 @@ scrollDelta          LONG
           GET(ClockQueue,ClockQueue.tabNumber)
           ClockQueue.lClock = ClockQueue.lCLock - CLOCK()
           PUT(ClockQueue)
+          IF NOT ThreadQueue.Options &= NULL
+             DISPOSE(ThreadQueue.Options)            ! the search thread is done with its START parameter
+             ThreadQueue.Options &= NULL
+          END
           DELETE(ThreadQueue)
           !dbx.Debugout('ThreadQueue for tab ' & ThreadQueue.tabNumber & ' deleted in take event')
        ELSE
