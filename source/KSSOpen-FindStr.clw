@@ -480,9 +480,11 @@ szBackslashes        CSTRING(512)
 ! Takes every <file name="..."/> inside <Opened_Files>. Tag and attribute names
 ! are case-insensitive; whitespace around '=' and single or double quotes are
 ! accepted. UTF-8 names are converted to the ANSI code page, entities are
-! decoded in one pass (see DecodeXmlEntities), and
-! names longer than OFFileName are skipped rather than truncated.
-! Sets bXmlLoadFailed when the file cannot be read or has no <Opened_Files>.
+! decoded in one pass (see DecodeXmlEntities), and names longer than
+! OFFileName are skipped rather than truncated.
+! Sets bXmlLoadFailed when the file cannot be read or is not a <File_List>;
+! a list with no <Opened_Files> section is a valid empty list.
+! Works on oXmlST, oXmlName and the intXml* variables declared with them.
 !-----------------------------------------------------------------------------
 LoadOpenedFiles      ROUTINE
   FREE(qOpenedFiles)
@@ -491,15 +493,18 @@ LoadOpenedFiles      ROUTINE
      bXmlLoadFailed = TRUE
      EXIT
   END
-  IF oXmlST.Instring('<<Opened_Files', 1, 1, 0, st:noCase) = 0
-     bXmlLoadFailed = TRUE
+  IF oXmlST.Instring('<<File_List', 1, 1, 0, st:noCase) = 0
+     bXmlLoadFailed = TRUE                               ! not an IDE file list at all
      EXIT
+  END
+  IF oXmlST.Instring('<<Opened_Files', 1, 1, 0, st:noCase) = 0
+     EXIT                                                ! the IDE writes <File_List ... /> when nothing was opened
   END
   oXmlST.SetValue(oXmlST.Between('<<Opened_Files>', '<</Opened_Files>', 1, 0, st:noCase))
   oXmlST.Replace('<9>', ' ')
   oXmlST.Replace('<13>', ' ')
   oXmlST.Replace('<10>', ' ')
-  oXmlST.Replace('<<file ', '<<file ', 0, 1, 0, st:noCase)
+  oXmlST.Replace('<<file ', '<<file ', 0, 1, 0, st:noCase)  ! normalise the tag's case so Split can find it
   oXmlST.Split('<<file ')
   LOOP intXmlLine = 1 TO oXmlST.Records()
      ! find name = "value" (or 'value'); ' name' has a leading space so filename= is not matched
@@ -538,12 +543,15 @@ LoadOpenedFiles      ROUTINE
      ADD(qOpenedFiles)
   END
 
+! Advances intXmlPos past spaces in oXmlName.
 SkipXmlSpaces        ROUTINE
   LOOP WHILE intXmlPos <= oXmlName.Length()
      IF oXmlName.Sub(intXmlPos) <> ' ' THEN BREAK.
      intXmlPos += 1
   END
 
+! Decodes XML entities in oXmlName in place (uses intXmlPos, intXmlEnd, intXmlCode,
+! intXmlBase, intXmlDigit, intXmlValid, szXmlDigits and oXmlTmp).
 DecodeXmlEntities    ROUTINE
   ! Single left-to-right pass, so an inserted character is never decoded again
   ! (&#38;amp; gives the text &amp;, not &). Handles &lt; &gt; &quot; &apos; &amp;
