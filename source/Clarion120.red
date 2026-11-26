@@ -1,11 +1,9 @@
--- KSSOpen redirection for Clarion 12.0
--- Derived from the Clarion 12 global CLARION120.RED. The only additions are the
--- repo-relative search paths at the top of [Common] (.\images, ..\libsrc\win, ..\lib).
+-- KSSOpen redirection for Clarion 12
+-- Output folders and the repo's own search paths are listed here; every other
+-- Clarion 12 default comes from the global file through {include}. The include
+-- only brings in search paths, which is why [Debug]/[Release] are spelled out.
 -- Clarion100.RED is left in place for Clarion 10/11 builds.
-
-[Copy]
--- Directories only used when copying dlls
-*.dll = %BIN%;%BIN%\AddIns\BackendBindings\ClarionBinding\Common;%ROOT%\Accessory\bin
+-- Keep CRLF line endings: the Clarion redirection parser does not read LF-only files.
 
 [Debug]
 *.obj = obj\debug
@@ -24,26 +22,7 @@
 *.map = map\release
 
 [Common]
--- KSSOpen repo paths
 *.*   = .; .\images; ..\libsrc\win
 *.lib = ..\lib
--- Clarion 12 defaults
-*.chm = %BIN%;%ROOT%\Accessory\bin
-*.tp? = %ROOT%\template\win
-*.trf = %ROOT%\template\win
-*.txs = %ROOT%\template\win
-*.stt = %ROOT%\template\win
-*.*   = .; %ROOT%\libsrc\win; %ROOT%\images; %ROOT%\template\win; %ROOT%\convsrc
-*.lib = %ROOT%\lib
-*.obj = %ROOT%\lib
-*.res = %ROOT%\lib
-*.dll = %BIN%
-*.tp? = %ROOT%\Accessory\template\win
-*.trf = %ROOT%\Accessory\template\win
-*.txs = %ROOT%\Accessory\template\win
-*.stt = %ROOT%\Accessory\template\win
-*.*   = %ROOT%\Accessory\libsrc\win; %ROOT%\Accessory\images; %ROOT%\Accessory\resources; %ROOT%\Accessory\template\win
-*.lib = %ROOT%\Accessory\lib
-*.obj = %ROOT%\Accessory\lib
-*.res = %ROOT%\Accessory\lib
-*.dll = %ROOT%\Accessory\bin
+
+{include %REDDIR%\%REDNAME%}
