@@ -124,11 +124,12 @@ EVENT:FoldMarginClick            EQUATE(EVENT:Last)
 
 COLOR_GRADIENTACTIVECAPTION      EQUATE(27)
 COLOR_GRADIENTINACTIVECAPTION    EQUATE(28)
-! Clarion 12 equates.clw also defines the two COLOR:GRADIENT* equates below (same values),
-! so a C12 build reports "Label duplicated, second used". The warning is harmless; they are
-! kept because Clarion 10 equates.clw does not define them and the source must still build there.
+! Clarion 12 equates.clw defines these two (same values); Clarion 10 equates.clw does not.
+! _C120_ is predefined by the Clarion 12 compiler (and later), so older versions still get them.
+  OMIT('**C120**', _C120_)
 COLOR:GRADIENTACTIVECAPTION      EQUATE(08000001BH)
 COLOR:GRADIENTINACTIVECAPTION    EQUATE(08000001CH)
+  !**C120**
 
 PROCESS_TERMINATE                EQUATE(00001h)
 PROCESS_CREATE_THREAD            EQUATE(00002h)
