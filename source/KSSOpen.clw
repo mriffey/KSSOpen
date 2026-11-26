@@ -2,7 +2,6 @@
 
 
   INCLUDE('cwHH.INC'),ONCE
-xFiles:TemplateVersion equate('3.25')
 StringTheory:TemplateVersion equate('3.38')
 !region Notices
 ! ================================================================================
@@ -125,6 +124,9 @@ EVENT:FoldMarginClick            EQUATE(EVENT:Last)
 
 COLOR_GRADIENTACTIVECAPTION      EQUATE(27)
 COLOR_GRADIENTINACTIVECAPTION    EQUATE(28)
+! Clarion 12 equates.clw also defines the two COLOR:GRADIENT* equates below (same values),
+! so a C12 build reports "Label duplicated, second used". The warning is harmless; they are
+! kept because Clarion 10 equates.clw does not define them and the source must still build there.
 COLOR:GRADIENTACTIVECAPTION      EQUATE(08000001BH)
 COLOR:GRADIENTINACTIVECAPTION    EQUATE(08000001CH)
 
@@ -410,8 +412,7 @@ CtrlShiftBar   EQUATE(988)
    INCLUDE('KEYCODES.CLW'),ONCE
    INCLUDE('SPECIALFOLDER.INC'),ONCE
    INCLUDE('ABFUZZY.INC'),ONCE
-   INCLUDE('UltimateDebug.INC'),ONCE 
-   INCLUDE('xfiles.inc'),ONCE
+   INCLUDE('KssDebug.inc'),ONCE
    INCLUDE('StringTheory.Inc'),ONCE
 !    Include('WinEvent.Inc'),Once
    INCLUDE('ABEIP.INC')
@@ -685,18 +686,7 @@ szExcludeMask                 CSTRING(256)
                            END
                         END
 CLSkel_TplVersion    CSTRING('v17.09.06.1, Released 2017-09-06')
-udb_Settings                GROUP,PRE(udb_Settings)
-DebugOff                            BOOL(FALSE)
-DebugPrefix                         STRING(20)
-SaveToFile                          BOOL(FALSE)
-ASCIIFileName                       STRING(100)
-DebugNoCR                           BYTE(FALSE)
-LineWrap                            BYTE(TRUE)
-ModuleName                          STRING(100)
-AppName                             STRING(100)
-Modified                            STRING(26)
-                            END
-UD                   UltimateDebug
+UD                   KssDebug                              ! Debug output via OutputDebugString (see libsrc\win\KssDebug.inc)
 WE::MustClose       long
 WE::CantCloseNow    long
 
@@ -723,13 +713,6 @@ VCRRequest           LONG(0),THREAD                        ! Set to the request 
   svSpecialFolder.CreateDirIn(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS' )
   INIMgr.Init(svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\' & 'kss.INI', NVD_INI)
 !  DctInit()
-    udb_Settings.DebugOff      =  0
-    udb_Settings.DebugPrefix   =  '!'
-    udb_Settings.SaveToFile    =  0
-    udb_Settings.ASCIIFileName =  'DebugLog.txt'
-    udb_Settings.DebugNoCR     =  1
-    udb_Settings.LineWrap      =  0
-    UD.INIT('global',udb_settings)
   SYSTEM{PROP:Icon} = '~kss.ico'
   SyncOptionsFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS\pattern.dat')
   INIMgr.Fetch('Global','AllowMultipleInstances',glo:AllowMultipleInstances)

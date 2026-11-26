@@ -46,7 +46,9 @@ FindStr              PROCEDURE  (STRING strOptionsGroup)   ! Declare Procedure
 !    along with Devuna-KwikSourceSearch.  If not, see <https://opensource.org/licenses/MIT>.
 ! ================================================================================
 !endregion Notices
-oXML         xFileXML 
+oXmlST       StringTheory                              ! Parses the IDE's *.cwproj.FileList.xml (replaces xFiles)
+oXmlName     StringTheory
+intXmlLine   LONG
 oST          StringTheory 
 intLoop      LONG 
 
@@ -181,7 +183,25 @@ szBackslashes        CSTRING(512)
             ! read cwproj.filelist.xml
             ! get filenames
             ! write temp file, add file name to szcmdline with /f: 
-            oXML.Load(qOpenedFiles,FindStrOptions.szFileListFilename,'Opened_Files','file')
+            ! Read <Opened_Files><file name="..." /></Opened_Files> into qOpenedFiles
+            FREE(qOpenedFiles)
+            IF oXmlST.LoadFile(FindStrOptions.szFileListFilename, 0, 0, st:removeBOM)
+               oXmlST.SetValue(oXmlST.Between('<<Opened_Files>', '<</Opened_Files>', 1, 0, st:noCase))
+               oXmlST.Split('<<file ')
+               LOOP intXmlLine = 1 TO oXmlST.Records()
+                  oXmlName.SetValue(oXmlST.GetLine(intXmlLine))
+                  oXmlName.SetValue(oXmlName.Between('name="', '"'))
+                  IF oXmlName.Length() = 0 THEN CYCLE.
+                  oXmlName.Replace('&lt;', '<<')
+                  oXmlName.Replace('&gt;', '>')
+                  oXmlName.Replace('&quot;', '"')
+                  oXmlName.Replace('&apos;', '''')
+                  oXmlName.Replace('&amp;', '&')
+                  CLEAR(qOpenedFiles)
+                  qOpenedFiles.OFFileName = oXmlName.GetValue()
+                  ADD(qOpenedFiles)
+               END
+            END
             !MESSAGE('records loaded=' & RECORDS(qOpenedFiles))
             oST.SetValue('')
             UD.DebugOff = FALSE 
