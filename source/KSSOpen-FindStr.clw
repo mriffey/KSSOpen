@@ -46,7 +46,20 @@ FindStr              PROCEDURE  (STRING strOptionsGroup)   ! Declare Procedure
 !    along with Devuna-KwikSourceSearch.  If not, see <https://opensource.org/licenses/MIT>.
 ! ================================================================================
 !endregion Notices
-oXML         xFileXML 
+oXmlST       StringTheory                              ! Parses the IDE's *.cwproj.FileList.xml (replaces xFiles)
+oXmlName     StringTheory
+oXmlTmp      StringTheory
+intXmlLine   LONG
+intXmlPos    LONG
+intXmlValue  LONG
+intXmlEnd    LONG
+intXmlCode   LONG
+intXmlBase   LONG
+intXmlDigit  LONG
+intXmlValid  LONG
+szXmlQuote   STRING(1)
+szXmlDigits  STRING(16)
+bXmlLoadFailed BYTE
 oST          StringTheory 
 intLoop      LONG 
 
@@ -181,7 +194,13 @@ szBackslashes        CSTRING(512)
             ! read cwproj.filelist.xml
             ! get filenames
             ! write temp file, add file name to szcmdline with /f: 
-            oXML.Load(qOpenedFiles,FindStrOptions.szFileListFilename,'Opened_Files','file')
+            DO LoadOpenedFiles
+            IF bXmlLoadFailed
+               MESSAGE('Could not read the IDE file list:||' & CLIP(FindStrOptions.szFileListFilename) & '||The search was not run.','Kwik Source Search',ICON:Exclamation)
+               FREE(ResultQueue)
+               POST(EVENT:THREAD+FindStrOptions.tabNumber,,1)
+               RETURN
+            END
             !MESSAGE('records loaded=' & RECORDS(qOpenedFiles))
             oST.SetValue('')
             UD.DebugOff = FALSE 
@@ -455,3 +474,145 @@ szBackslashes        CSTRING(512)
       !dbx.Debugout('Thread Event posted for tab ' & FindStrOptions.tabNumber & '  in FindStr')
       POST(EVENT:THREAD+FindStrOptions.tabNumber,,1)
       !ASSERT(0,eqDBG & 'Thread ' & thread() & ' finished')
+
+!-----------------------------------------------------------------------------
+! Reads the Clarion IDE's *.cwproj.FileList.xml into qOpenedFiles.
+! Takes every <file name="..."/> inside <Opened_Files>. Tag and attribute names
+! are case-insensitive; whitespace around '=' and single or double quotes are
+! accepted. UTF-8 names are converted to the ANSI code page, entities are
+! decoded in one pass (see DecodeXmlEntities), and names longer than
+! OFFileName are skipped rather than truncated.
+! Sets bXmlLoadFailed when the file cannot be read or is not a <File_List>;
+! a list with no <Opened_Files> section is a valid empty list.
+! Works on oXmlST, oXmlName and the intXml* variables declared with them.
+!-----------------------------------------------------------------------------
+LoadOpenedFiles      ROUTINE
+  FREE(qOpenedFiles)
+  bXmlLoadFailed = FALSE
+  IF NOT oXmlST.LoadFile(FindStrOptions.szFileListFilename, 0, 0, st:removeBOM)
+     bXmlLoadFailed = TRUE
+     EXIT
+  END
+  IF oXmlST.Instring('<<File_List', 1, 1, 0, st:noCase) = 0
+     bXmlLoadFailed = TRUE                               ! not an IDE file list at all
+     EXIT
+  END
+  IF oXmlST.Instring('<<Opened_Files', 1, 1, 0, st:noCase) = 0
+     EXIT                                                ! the IDE writes <File_List ... /> when nothing was opened
+  END
+  oXmlST.SetValue(oXmlST.Between('<<Opened_Files>', '<</Opened_Files>', 1, 0, st:noCase))
+  oXmlST.Replace('<9>', ' ')
+  oXmlST.Replace('<13>', ' ')
+  oXmlST.Replace('<10>', ' ')
+  oXmlST.Replace('<<file ', '<<file ', 0, 1, 0, st:noCase)  ! normalise the tag's case so Split can find it
+  oXmlST.Split('<<file ')
+  LOOP intXmlLine = 1 TO oXmlST.Records()
+     ! find name = "value" (or 'value'); ' name' has a leading space so filename= is not matched
+     oXmlName.SetValue(' ' & oXmlST.GetLine(intXmlLine))
+     intXmlValue = 0
+     intXmlPos = 1
+     LOOP
+        intXmlPos = oXmlName.Instring(' name', 1, intXmlPos, 0, st:noCase)
+        IF intXmlPos = 0 THEN BREAK.
+        intXmlPos += 5
+        DO SkipXmlSpaces
+        IF oXmlName.Sub(intXmlPos) <> '=' THEN CYCLE.
+        intXmlPos += 1
+        DO SkipXmlSpaces
+        szXmlQuote = oXmlName.Sub(intXmlPos)
+        IF szXmlQuote <> '"' AND szXmlQuote <> '''' THEN CYCLE.
+        intXmlValue = intXmlPos + 1
+        BREAK
+     END
+     IF intXmlValue = 0 THEN CYCLE.
+     intXmlEnd = oXmlName.Instring(szXmlQuote, 1, intXmlValue)
+     IF intXmlEnd <= intXmlValue THEN CYCLE.             ! no closing quote, or empty name
+     oXmlName.SetValue(oXmlName.Slice(intXmlValue, intXmlEnd - 1))
+     ! XML text is UTF-8: convert to the ANSI code page without NFKC folding
+     IF oXmlName.IsValidUtf8()
+        oXmlName.Normalize = FALSE
+        oXmlName.ToAnsi(st:EncodeUtf8, st:CP_ACP)
+     END
+     DO DecodeXmlEntities
+     IF oXmlName.Length() > SIZE(qOpenedFiles.OFFileName)
+        UD.Debug('KSS: FileList.xml entry too long, skipped: ' & oXmlName.GetValue())
+        CYCLE
+     END
+     CLEAR(qOpenedFiles)
+     qOpenedFiles.OFFileName = oXmlName.GetValue()
+     ADD(qOpenedFiles)
+  END
+
+! Advances intXmlPos past spaces in oXmlName.
+SkipXmlSpaces        ROUTINE
+  LOOP WHILE intXmlPos <= oXmlName.Length()
+     IF oXmlName.Sub(intXmlPos) <> ' ' THEN BREAK.
+     intXmlPos += 1
+  END
+
+! Decodes XML entities in oXmlName in place (uses intXmlPos, intXmlEnd, intXmlCode,
+! intXmlBase, intXmlDigit, intXmlValid, szXmlDigits and oXmlTmp).
+DecodeXmlEntities    ROUTINE
+  ! Single left-to-right pass, so an inserted character is never decoded again
+  ! (&#38;amp; gives the text &amp;, not &). Handles &lt; &gt; &quot; &apos; &amp;
+  ! and &#nnn; / &#xhh; with values 1-255; anything else is left as is.
+  intXmlPos = 1
+  LOOP
+     intXmlPos = oXmlName.Instring('&', 1, intXmlPos)
+     IF intXmlPos = 0 THEN BREAK.
+     intXmlEnd = oXmlName.Instring(';', 1, intXmlPos)
+     IF intXmlEnd = 0 THEN BREAK.
+     intXmlCode = 0
+     intXmlValid = intXmlEnd - intXmlPos - 1                ! length of the entity body
+     IF INRANGE(intXmlValid, 1, 8)
+        szXmlDigits = LOWER(oXmlName.Slice(intXmlPos + 1, intXmlEnd - 1))
+        CASE CLIP(szXmlDigits)
+        OF 'lt'
+           intXmlCode = 60
+        OF 'gt'
+           intXmlCode = 62
+        OF 'quot'
+           intXmlCode = 34
+        OF 'apos'
+           intXmlCode = 39
+        OF 'amp'
+           intXmlCode = 38
+        ELSE
+           IF szXmlDigits[1] = '#'
+              IF szXmlDigits[2] = 'x'
+                 intXmlBase = 16
+                 intXmlDigit = 3
+              ELSE
+                 intXmlBase = 10
+                 intXmlDigit = 2
+              END
+              IF intXmlDigit > intXmlValid
+                 intXmlValid = 0                            ! &#; or &#x;
+              END
+              LOOP WHILE intXmlValid AND intXmlDigit <= intXmlValid
+                 IF INSTRING(szXmlDigits[intXmlDigit], SUB('0123456789abcdef', 1, intXmlBase), 1, 1) = 0
+                    intXmlValid = 0
+                    BREAK
+                 END
+                 intXmlCode = intXmlCode * intXmlBase + INSTRING(szXmlDigits[intXmlDigit], '0123456789abcdef', 1, 1) - 1
+                 intXmlDigit += 1
+              END
+              IF NOT intXmlValid
+                 intXmlCode = 0
+              END
+           END
+        END
+     END
+     IF INRANGE(intXmlCode, 1, 255)
+        oXmlTmp.SetValue('')
+        IF intXmlPos > 1
+           oXmlTmp.Append(oXmlName.Slice(1, intXmlPos - 1))
+        END
+        oXmlTmp.Append(CHR(intXmlCode))
+        IF intXmlEnd < oXmlName.Length()
+           oXmlTmp.Append(oXmlName.Slice(intXmlEnd + 1))
+        END
+        oXmlName.SetValue(oXmlTmp)
+     END
+     intXmlPos += 1                                         ! past the decoded char, or past a bare '&'
+  END
