@@ -1317,7 +1317,7 @@ j                    LONG
       DO PreDelete
 
       IF bPlaying > 0
-         thisSortname = UPPER(MacroQueue.szField3) & UPPER(MacroQueue.szField2) & UPPER(MacroQueue.szField3)
+         thisSortname = UPPER(MacroQueue.szField3) & UPPER(MacroQueue.szField1) & UPPER(MacroQueue.szField2)   ! path & filename & ext, as recorded
          bPlaying -= 1
       ELSE
          thisSortname = SearchQueue.ResultQueue.SortName
@@ -3740,6 +3740,8 @@ buttonPressed        LONG
              Window{PROP:Timer} = 0
              DO RefreshEditPane
           END
+       ELSE
+          Window{PROP:Timer} = 0                    ! focus left the list before the pending refresh: stop the 20 Hz navigation timer
        END
     OF EVENT:CreateRestorePoint
        DO CreateRestorePoint
