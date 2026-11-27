@@ -3740,8 +3740,8 @@ buttonPressed        LONG
              Window{PROP:Timer} = 0
              DO RefreshEditPane
           END
-       ELSE
-          Window{PROP:Timer} = 0                    ! focus left the list before the pending refresh: stop the 20 Hz navigation timer
+       ELSIF NOT EditPaneRefreshPending
+          Window{PROP:Timer} = 0                    ! focus is elsewhere and nothing is pending: stop the 20 Hz navigation timer
        END
     OF EVENT:CreateRestorePoint
        DO CreateRestorePoint

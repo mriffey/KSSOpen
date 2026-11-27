@@ -219,7 +219,19 @@ currentPath    LIKE(ResultQueue.Path)
          END
          !ASSERT(0,eqDBG & 'Thread ' & thread() & ' look for delimiter ' & thisString)
          IF bFileListFromFile = TRUE
-            DO ProcessThisString
+            IF RECORDS(excludeQueue)
+               !absolute path here: the file name ends at the first ':' after the drive colon
+               p = INSTRING(':',thisString,1,3)
+               IF p > 1
+                  excludeName = thisString[1 : p-1]
+               ELSE
+                  excludeName = thisString
+               END
+               DO CheckExcluded
+            END
+            IF NOT bExcluded
+               DO ProcessThisString
+            END
          ELSE
             IF thisString[1 : 2] = '  '
                thisFolder = CLIP(LEFT(thisString))
@@ -258,14 +270,15 @@ currentPath    LIKE(ResultQueue.Path)
                   !the file name is the text before the first ':' (file:line:text, or just file with /m)
                   p = INSTRING(':',thisString,1,1)
                   IF p > 1
-                     excludeName = thisFolder & thisString[1 : p-1]
+                     excludeName = thisString[1 : p-1]
                   ELSE
-                     excludeName = thisFolder & thisString
+                     excludeName = thisString
                   END
-                  IF excludeName <> lastExcludeName
-                     lastExcludeName = excludeName
-                     DO TestExcludeMasks
+                  IF NUMERIC(excludeName) AND NOT INSTRING('/s',glo:findstrCommandLine,1)
+                     excludeName = szFixedFileMask          !one file searched: findstr leaves out its name (as in ProcessThisString)
                   END
+                  excludeName = thisFolder & excludeName
+                  DO CheckExcluded
                END
 
                thisString = thisFolder & thisString
@@ -285,6 +298,12 @@ currentPath    LIKE(ResultQueue.Path)
          ELSE
             thisBuffer = ''
          END
+      END
+
+CheckExcluded        ROUTINE
+      IF excludeName <> lastExcludeName
+         lastExcludeName = excludeName
+         DO TestExcludeMasks
       END
 
 TestExcludeMasks     ROUTINE
