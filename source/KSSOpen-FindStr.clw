@@ -417,17 +417,12 @@ szBackslashes        CSTRING(512)
                      LOOP i = j TO 1 BY -1
                         IF CancelFlag = TRUE THEN BREAK.
                         GET(ResultQueue,i)
-                        x# = 1
-                        IF thisFile <> ResultQueue.Filename & ResultQueue.szExtension
-                           thisFile = ResultQueue.Filename & ResultQueue.szExtension
-                        END
                         IF NOT MatchWithoutComment(ResultQueue.Text,szMatchPattern,bMatchMode,ResultQueue.szExtension)
                            DELETE(ResultQueue)
                         END
                         IF i % 256 = 0 THEN YIELD().
                      END
                   END
-
                   SETPATH(SavePath)
                ELSE
                   MESSAGE('Stdin SetHandleInformation')
@@ -450,6 +445,16 @@ szBackslashes        CSTRING(512)
       piProcInfo.hProcess = 0                              ! never TerminateProcess a closed (possibly reused) handle
       cs.Release()
 
+      IF glo:bResultsCapped = TRUE                         ! stopped at glo:MaxResults: shown in the match count
+         cs.Wait()
+         ThreadQueue.tabNumber = FindStrOptions.tabNumber
+         GET(ThreadQueue,+ThreadQueue.tabNumber)
+         IF NOT ERRORCODE()
+            ThreadQueue.bCapped = TRUE
+            PUT(ThreadQueue)
+         END
+         cs.Release()
+      END
       !dbx.Debugout('Thread Event posted for tab ' & FindStrOptions.tabNumber & '  in FindStr')
       POST(EVENT:THREAD+FindStrOptions.tabNumber,,1)
       !ASSERT(0,eqDBG & 'Thread ' & thread() & ' finished')

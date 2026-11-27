@@ -57,6 +57,8 @@ StatementQueue       QUEUE
 statement               &CSTRING
                      END
 clText               &CSTRING
+clTextBuffer         CSTRING(2050)                         ! used when szText fits (result rows: CSTRING(1025))
+bClTextNew           BOOL(FALSE)
 i                    LONG
 j                    LONG
 AltQueue             QUEUE                                 ! the | alternatives of szPattern, as FindStr searches them
@@ -68,7 +70,12 @@ altIndex             LONG
     
       DO SplitPattern
       CommentStyle = GetCommentStyle(szExtension)
-      clText &= NEW CSTRING(SIZE(szText)+1)
+      IF SIZE(szText) + 1 <= SIZE(clTextBuffer)
+         clText &= clTextBuffer
+      ELSE
+         clText &= NEW CSTRING(SIZE(szText)+1)
+         bClTextNew = TRUE
+      END
       clText = szText
       j = LEN(clText)
       LOOP i = 1 TO j
@@ -111,7 +118,9 @@ altIndex             LONG
       ELSE
          pMatch = TRUE
       END
-      DISPOSE(clText)
+      IF bClTextNew = TRUE
+         DISPOSE(clText)
+      END
       RETURN pMatch
 
 ProcessText   ROUTINE

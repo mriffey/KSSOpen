@@ -119,9 +119,11 @@ bExcluded      BOOL(FALSE)       !result for lastExcludeName
    END
 
    FREE(ResultQueue)
+   glo:bResultsCapped = FALSE
    j = RECORDS(STDOUT_Queue)
    LOOP i = 1 TO j
       IF bCancelFlag = TRUE THEN BREAK.                  ! cancelled: keep the rows parsed so far
+      IF glo:bResultsCapped = TRUE THEN BREAK.           ! stopped at glo:MaxResults matches
       GET(STDOUT_Queue,i)
       sizeNeeded = LEN(thisBuffer) + LEN(STDOUT_Queue.Buffer) + 1
       IF sizeNeeded > SIZE(thisBuffer)
@@ -417,7 +419,11 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                   ResultQueue.FileDate = currentFileDate
                   ResultQueue.FileTime = currentFileTime
 
-                  ADD(ResultQueue)                             ! sorted once after the output is read
+                  IF glo:MaxResults > 0 AND RECORDS(ResultQueue) >= glo:MaxResults
+                     glo:bResultsCapped = TRUE                 ! keep memory bounded on huge result sets
+                  ELSE
+                     ADD(ResultQueue)                          ! sorted once after the output is read
+                  END
                END
             ELSIF bFilenamesOnly
                szPath = thisString
@@ -448,7 +454,11 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                ResultQueue.FileDate = currentFileDate
                ResultQueue.FileTime = currentFileTime
 
-               ADD(ResultQueue)                                ! sorted once after the output is read
+               IF glo:MaxResults > 0 AND RECORDS(ResultQueue) >= glo:MaxResults
+                  glo:bResultsCapped = TRUE
+               ELSE
+                  ADD(ResultQueue)                             ! sorted once after the output is read
+               END
             END
 
 ProcessFile    ROUTINE

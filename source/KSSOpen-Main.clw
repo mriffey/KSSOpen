@@ -208,6 +208,9 @@ bDoAutoSize             BOOL(FALSE)
 AutoSizeQueue           QUEUE                              ! tabs whose search finished while another tab was shown
 tabNumber                 LONG
                         END
+CappedQueue             QUEUE                              ! tabs whose last search stopped at glo:MaxResults
+tabNumber                 LONG
+                        END
 bClosePending           BOOL(FALSE)                        ! close requested while searches were running
 bForceClose             BOOL(FALSE)                        ! close now, even if searches are still running
 closePendingClock       LONG
@@ -630,6 +633,7 @@ szIniPattern      LIKE(SearchQueue.szPattern)
       INIMgr.Update('Global','NewSearchAction',glo:NewSearchAction)
       INIMgr.Update('Global','NoDownloadVersion',glo:szNoDownloadVersion)
       INIMgr.Update('Global','DeleteWarningCount',glo:nDeleteWarningCount)
+      INIMgr.Update('Global','MaxResults',glo:MaxResults)
       INIMgr.Update('Global','DefaultSearchButton',glo:nDefaultSearchButton)
       INIMgr.Update('Global','DontShowSubdirectoryWarning',glo:bDontShowSubdirectoryWarning)
       INIMgr.Update('Global','SyncPathWithPattern',glo:SyncPathWithPattern)
@@ -1201,6 +1205,11 @@ Remaining      LONG
          ELSE
             SearchQueue.szMatchesFound = SearchQueue.szMatchesFound & ', ' & CLIP(LEFT(FORMAT(Remaining,@N_14))) & ' remaining.'
          END
+         CappedQueue.tabNumber = SearchQueue.tabNumber
+         GET(CappedQueue,CappedQueue.tabNumber)
+         IF NOT ERRORCODE()
+            SearchQueue.szMatchesFound = SearchQueue.szMatchesFound & ' Stopped at the ' & CLIP(LEFT(FORMAT(glo:MaxResults,@N_14))) & ' match limit (MaxResults).'
+         END
 
          DISPLAY(?szMatchesFound)
 PreDelete   ROUTINE
@@ -1244,8 +1253,11 @@ PostDelete  ROUTINE
 ProcessDeleteQueue      ROUTINE
    DATA
 indx        LONG
+saveModMask LONG
 
    CODE
+      saveModMask = SciControl.GetModEventMask()
+      SciControl.SetModEventMask(0)                ! no SCN_MODIFIED (event-loop round trip) per removed bookmark
       LOOP indx = 1 TO RECORDS(DeleteQueue)
          GET(DeleteQueue,indx)
          GET(SearchQueue.ResultQueue,DeleteQueue.pointer)
@@ -1258,6 +1270,7 @@ indx        LONG
          END
          DELETE(SearchQueue.ResultQueue)
       END
+      SciControl.SetModEventMask(saveModMask)
       IF bRecording = TRUE
          ADD(MacroQueue)
       END
@@ -1445,17 +1458,17 @@ thisText    LIKE(SearchQueue.ResultQueue.Text)
    CODE
       DO PreDelete
 
+      bMatchMode = Match:Simple
+      IF NOT SearchQueue.bCaseSensitive
+         bMatchMode = BOR(bMatchMode,Match:NoCase)
+      END
+      IF SearchQueue.bUseRegularExpressions
+         bMatchMode = BOR(bMatchMode,Match:Regular)
+      END
       j = RECORDS(SearchQueue.ResultQueue)
       LOOP i = j TO 1 BY -1
          GET(SearchQueue.ResultQueue,i)
          thisText = CLIP(LEFT(SearchQueue.ResultQueue.Text))
-         bMatchMode = Match:Simple
-         IF NOT SearchQueue.bCaseSensitive
-            bMatchMode = BOR(bMatchMode,Match:NoCase)
-         END
-         IF SearchQueue.bUseRegularExpressions
-            bMatchMode = BOR(bMatchMode,Match:Regular)
-         END
          IF NOT MatchWithoutComment(thisText,SearchQueue.szPattern,bMatchMode,SearchQueue.ResultQueue.szExtension)
             DeleteQueue.pointer = POINTER(SearchQueue.ResultQueue)
             ADD(DeleteQueue)
@@ -1952,22 +1965,17 @@ dwId        DWORD
 bSearching  BOOL
 rrlQueue    QUEUE(ff_:queue),PRE(RRL)
             END
+WrittenQueue QUEUE,PRE(WQ)                         ! restore point files written in this pass
+name          CSTRING(261)
+            END
+rrlLongQueue QUEUE(FILE:queue),PRE(RLQ)
+            END
 
    CODE
       dwId = kcr_GetCurrentProcessId()
       svSpecialFolder.CreateDirIn(SV:CSIDL_APPDATA, '\Devuna\KSS\RestorePoint\' & dwId)
 
-      !make sure folder is empty
-      szFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA) & '\Devuna\KSS\RestorePoint\' & dwId & '\*.RRL'
-      DIRECTORY(rrlQueue,szFilename,ff_:NORMAL)
-      LOOP i = 1 TO RECORDS(rrlQueue)
-         GET(rrlQueue,i)
-         szFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA) & '\Devuna\KSS\RestorePoint\' & dwId & '\' & rrlQueue.name
-         IF kcr_DeleteFile(szFilename)
-         END
-      END
-
-      !now create the restore point
+      !now create the restore point: each tab's file is written to a .tmp and renamed over the old one
       p = POINTER(SearchQueue)
       options &= ADDRESS(SearchQueue)
       LOOP i = 1 to RECORDS(SearchQueue)
@@ -1979,9 +1987,25 @@ rrlQueue    QUEUE(ff_:queue),PRE(RRL)
          cs.release()
          IF bSearching THEN CYCLE.
          szFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA) & '\Devuna\KSS\RestorePoint\' & dwId & '\KSS_Results_Tab' & FORMAT(SearchQueue.tabNumber,@N03) & '.rrl'
-         CreateRestorePoint(Options, szFilename)
+         CreateRestorePoint(Options, szFilename, TRUE)
+         WrittenQueue.name = UPPER('KSS_Results_Tab' & FORMAT(SearchQueue.tabNumber,@N03) & '.rrl')
+         ADD(WrittenQueue,+WrittenQueue.name)
       END
       GET(SearchQueue,p)
+
+      !remove files of tabs not written now (closed, or still searching)
+      szFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA) & '\Devuna\KSS\RestorePoint\' & dwId & '\*.RRL'
+      DIRECTORY(rrlLongQueue,szFilename,ff_:NORMAL)    ! FILE:queue: long names (ff_:queue gives 8.3 names)
+      LOOP i = 1 TO RECORDS(rrlLongQueue)
+         GET(rrlLongQueue,i)
+         WrittenQueue.name = UPPER(CLIP(rrlLongQueue.name))
+         GET(WrittenQueue,WrittenQueue.name)
+         IF ERRORCODE()
+            szFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA) & '\Devuna\KSS\RestorePoint\' & dwId & '\' & CLIP(rrlLongQueue.name)
+            IF kcr_DeleteFile(szFilename)
+            END
+         END
+      END
    EXIT
 
 ThisWindow.Ask PROCEDURE
@@ -2231,6 +2255,7 @@ MONITOR_DEFAULTTOPRIMARY   EQUATE(00000001h)
   INIMgr.Fetch('Global','NewSearchAction',glo:NewSearchAction)
   INIMgr.Fetch('Global','NoDownloadVersion',glo:szNoDownloadVersion)
   INIMgr.Fetch('Global','DeleteWarningCount',glo:nDeleteWarningCount)
+  INIMgr.Fetch('Global','MaxResults',glo:MaxResults)
   INIMgr.Fetch('Global','DefaultSearchButton',glo:nDefaultSearchButton)
   INIMgr.Fetch('Global','DontShowSubdirectoryWarning',glo:bDontShowSubdirectoryWarning)
   INIMgr.Fetch('Global','SyncPathWithPattern',glo:SyncPathWithPattern)
@@ -2635,6 +2660,7 @@ Looped BYTE
             ThreadQueue.Options &= strOptions     ! keep the START parameter alive until the thread has finished
             ThreadQueue.Results &= privateResults
             ThreadQueue.bCloseTab = FALSE
+            ThreadQueue.bCapped = FALSE
             ADD(ThreadQueue,+ThreadQueue.tabNumber)
             cs.release()
       
@@ -3069,6 +3095,13 @@ bFinishedTabFound    BOOL
              ThreadQueue.Options &= NULL
           END
           bCloseFinishedTab = ThreadQueue.bCloseTab
+          CappedQueue.tabNumber = finishedTab
+          GET(CappedQueue,CappedQueue.tabNumber)
+          IF ThreadQueue.bCapped = TRUE
+             IF ERRORCODE() THEN ADD(CappedQueue,+CappedQueue.tabNumber).
+          ELSIF NOT ERRORCODE()
+             DELETE(CappedQueue)
+          END
           finishedResults &= ThreadQueue.Results
           ThreadQueue.Results &= NULL
           DELETE(ThreadQueue)

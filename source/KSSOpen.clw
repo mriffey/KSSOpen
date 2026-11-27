@@ -502,7 +502,7 @@ PropertyEditor         FUNCTION(*CSTRING szPropertyFile, LONG MaxStyleIndex),BOO
 ListBoxFormatter       FUNCTION(ListFormatQueueType pListFormatQueue),STRING   !
      END
      MODULE('KSSOpen-RestorePointIO.CLW')
-CreateRestorePoint     FUNCTION(FindStrOptionsGroupType pFindStrOptions, *CSTRING szFilename),LONG,PROC   !
+CreateRestorePoint     FUNCTION(FindStrOptionsGroupType pFindStrOptions, *CSTRING szFilename, BYTE pCompact=0),LONG,PROC   !pCompact: format 02 (restore points)
 LoadRestorePoint       FUNCTION(FindStrOptionsGroupType pFindStrOptions, <*CSTRING szRestorePointFile>),LONG,PROC   !
      END
      MODULE('KSSOpen-winShowMatchSummary.CLW')
@@ -617,6 +617,8 @@ glo:sqlProperties    CSTRING(33)
 glo:bSearchNewTabPressed BYTE
 glo:nDefaultSearchButton BYTE(2)
 glo:nDeleteWarningCount LONG
+glo:MaxResults       LONG(1000000)                         ! a search stops adding rows at this many matches (0 = no limit; [Global] MaxResults)
+glo:bResultsCapped   BYTE,THREAD                           ! set by FillResultQueue when it stopped at glo:MaxResults
 glo:bDontShowSubdirectoryWarning BOOL
 glo:SyncPathWithPattern BOOL
 glo:PlusKey          LONG(06Bh)
@@ -653,6 +655,7 @@ lClock                 LONG
 Options                &STRING                   ! START parameter for FindStr; disposed when the thread posts EVENT:THREAD
 Results                &ResultQueueType          ! queue the thread fills; swapped into the tab when the thread posts EVENT:THREAD
 bCloseTab              BYTE                      ! close the tab once the thread has finished
+bCapped                BYTE                      ! the search stopped at glo:MaxResults matches
                      END
 STDOUT_Queue         QUEUE(STDOUTQueueType),PRE(SQ),THREAD
                      END
