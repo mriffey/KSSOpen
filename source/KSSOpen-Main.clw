@@ -2722,6 +2722,9 @@ Looped BYTE
                SearchQueue = findStrOptions
                SearchQueue.tabNumber = (?CurrentSearch{PROP:ChoiceFEQ})
                PUT(SearchQueue)
+               CappedQueue.tabNumber = SearchQueue.tabNumber   ! loaded results: no limit note
+               GET(CappedQueue,CappedQueue.tabNumber)
+               IF NOT ERRORCODE() THEN DELETE(CappedQueue).
                (?CurrentSearch{PROP:ChoiceFEQ}){PROP:Text} = SearchQueue.szPattern
                ?ResultList{PROP:From} = SearchQueue.ResultQueue
                ?ResultList{PROP:Format} = SearchQueue.szListBoxFormat
@@ -2770,6 +2773,9 @@ Looped BYTE
                   SearchQueue = findStrOptions
                   SearchQueue.tabNumber = (?CurrentSearch{PROP:ChoiceFEQ})
                   PUT(SearchQueue)
+                  CappedQueue.tabNumber = SearchQueue.tabNumber   ! loaded results: no limit note
+                  GET(CappedQueue,CappedQueue.tabNumber)
+                  IF NOT ERRORCODE() THEN DELETE(CappedQueue).
                   (?CurrentSearch{PROP:ChoiceFEQ}){PROP:Text} = SearchQueue.szPattern
                   ?ResultList{PROP:From} = SearchQueue.ResultQueue
                   ?ResultList{PROP:Format} = SearchQueue.szListBoxFormat

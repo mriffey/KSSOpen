@@ -352,17 +352,28 @@ ImportData  ROUTINE
                   DO ReadCompactQueue
                END
                IF bQueueComplete = TRUE
+                  ! copy in order (a DELETE from the front of the temporary queue per row would shift it every time)
                   FREE(pFindStrOptions.ResultQueue)
                   LOOP lQueuePointer = 1 TO RECORDS(tmpResults)
                      GET(tmpResults,lQueuePointer)
                      pFindStrOptions.ResultQueue = tmpResults
                      ADD(pFindStrOptions.ResultQueue)
+                     IF ERRORCODE() THEN bQueueComplete = FALSE ; BREAK.
                   END
+                  FREE(tmpResults)
                   FREE(pFindStrOptions.UndoQueue)
                   LOOP lQueuePointer = 1 TO RECORDS(tmpUndo)
+                     IF bQueueComplete = FALSE THEN BREAK.
                      GET(tmpUndo,lQueuePointer)
                      pFindStrOptions.UndoQueue = tmpUndo
                      ADD(pFindStrOptions.UndoQueue)
+                     IF ERRORCODE() THEN bQueueComplete = FALSE ; BREAK.
+                  END
+                  IF bQueueComplete = FALSE                 ! out of memory while copying: no partial results
+                     FREE(pFindStrOptions.ResultQueue)
+                     FREE(pFindStrOptions.UndoQueue)
+                     MESSAGE('There was not enough memory to load ' & szImpExFileName & '.','Error - Load Aborted',ICON:Hand)
+                     ReturnValue = Level:Notify
                   END
                ELSE
                   MESSAGE(szImpExFileName & ' is damaged or incomplete and was not loaded.','Error - Load Aborted',ICON:Hand)
@@ -477,6 +488,7 @@ ReadCompactQueue ROUTINE
             DO UnpackLong ; rowTarget.FileTime = fieldLen
             IF bReadOk = FALSE OR blockPos <> rowEnd THEN BREAK.   ! damaged row: stop here
             ADD(rowTarget)
+            IF ERRORCODE() THEN BREAK.                ! out of memory: the queue reads as incomplete
             lQueuePointer += 1
          END
          IF blockPos < ulLength AND lQueuePointer < lQueueRecords THEN BREAK.   ! damaged block
