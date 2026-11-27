@@ -205,6 +205,17 @@ CurrentFilename         CSTRING(MAX_PATH)
 szTitle                 CSTRING(256)
 bAutoSearch             BOOL
 bDoAutoSize             BOOL(FALSE)
+AutoSizeQueue           QUEUE                              ! tabs whose search finished while another tab was shown
+tabNumber                 LONG
+                        END
+bClosePending           BOOL(FALSE)                        ! close requested while searches were running
+bForceClose             BOOL(FALSE)                        ! close now, even if searches are still running
+closePendingClock       LONG
+LexerCacheLexer         LONG(-1)                           ! lexer and property file last loaded by SetLexerType
+LexerCacheFile          CSTRING(256)
+bLexerCacheValid        BOOL(FALSE)                        ! cleared by SetDefaultStyles and every other properties load
+bPropertiesLoaded       BOOL(FALSE)                        ! the last SetLexer loaded its property file
+CLOSE_FORCE_DELAY       EQUATE(500)                        ! 1/100 s before a repeated close request closes despite running searches
 FocusPosition           LONG
 FoldMarginClicked       BOOL
 bShowEvalMessage        BOOL(FALSE)
@@ -576,6 +587,7 @@ SaveSearchParameters ROUTINE
    DATA
 n                 LONG
 LocationColWidth  LONG
+szIniPattern      LIKE(SearchQueue.szPattern)
 
    CODE
       INIMgr.Update('Search Options','bMatchPatternStartOfLine',SearchQueue.bMatchPatternStartOfLine)
@@ -589,9 +601,12 @@ LocationColWidth  LONG
       INIMgr.Update('Search Options','bExcludeComments',SearchQueue.bExcludeComments)
       !INIMgr.Update('Search Options','bIncludeBinary',SearchQueue.bIncludeBinary)
 
-      ReplaceChr(SearchQueue.szPattern,'''','§')
+      ! Swap ' for § only in the copy written to the INI. Changing SearchQueue.szPattern itself left the
+      ! tab's pattern with §, so the Cmt button (DeleteCommentLines) never matched patterns with an apostrophe.
+      szIniPattern = SearchQueue.szPattern
+      ReplaceChr(szIniPattern,'''','§')
       !ReplaceChr(SearchQueue.szPattern,'''','<A7h>')  ! MR 20190217 avoid losing this important hex char to random translation. 
-      INIMgr.Update('Search Options','szPattern',SearchQueue.szPattern)
+      INIMgr.Update('Search Options','szPattern',szIniPattern)
 
       INIMgr.Update('Search Options','szSearchPath',SearchQueue.szSearchPath)
       INIMgr.Update('Search Options','szFileMask',SearchQueue.szFileMask)
@@ -662,7 +677,38 @@ LocationColWidth  LONG
 
       INIMgr.UpdateQueue('Macro Queue','Macro',MacroQueue,MacroQueue.feqButton,MacroQueue.szField1,MacroQueue.szField2,MacroQueue.szField3)
    EXIT
+!-----------------------------------------------------------------------------
+! Cancels the search in the current ThreadQueue record: stops findstr and sets the
+! thread's cancel flag. The caller holds cs. The thread still runs to its end and
+! posts EVENT:THREAD; its queues are released there.
+CancelThreadSearch ROUTINE
+   DATA
+cancelProcInfo   &PROCESS_INFORMATION
+cancelFlagRef    &BYTE
+   CODE
+      cancelProcInfo &= (INSTANCE(piProcInfo,ThreadQueue.ID))
+      IF NOT cancelProcInfo &= NULL
+         kcr_TerminateProcess(cancelProcInfo.hProcess,0)
+      END
+      cancelFlagRef &= (INSTANCE(CancelFlag,ThreadQueue.ID))
+      IF NOT cancelFlagRef &= NULL
+         cancelFlagRef = TRUE
+      END
+   EXIT
 HandleCloseTab ROUTINE
+      ! A search still running on this tab: cancel it and close the tab in TakeEvent when
+      ! the thread posts EVENT:THREAD, instead of freeing queues the thread still uses.
+      cs.wait()
+      ThreadQueue.tabNumber = ?CurrentSearch{PROP:ChoiceFEQ}
+      GET(ThreadQueue,+ThreadQueue.tabNumber)
+      IF NOT ERRORCODE()
+         ThreadQueue.bCloseTab = TRUE
+         PUT(ThreadQueue)
+         DO CancelThreadSearch
+         cs.release()
+         EXIT
+      END
+      cs.release()
       IF ?CurrentSearch{PROP:ChoiceFEQ} <> ?Search1
          DO CloseTab
       ELSE
@@ -695,22 +741,7 @@ thisProcInfo         &PROCESS_INFORMATION
       GET(SearchQueue,SearchQueue.tabNumber)
       IF ~ERRORCODE()
          p = POINTER(SearchQueue)
-
-         cs.wait()
-         j = RECORDS(ThreadQueue)
-         LOOP i = 1 TO j
-            GET(ThreadQueue,i)
-            IF ThreadQueue.tabNumber = SearchQueue.tabNumber
-               thisProcInfo &= (INSTANCE(piProcInfo,ThreadQueue.ID))
-               IF NOT thisProcInfo &= NULL
-                  kcr_TerminateProcess(thisProcInfo.hProcess,0)
-               END
-               POST(EVENT:CloseWindow,,ThreadQueue.ID)
-               !YIELD()
-            END
-         END
-         cs.release()
-         YIELD()
+         ! no search thread runs for this tab here: HandleCloseTab defers the close until it has finished
 
          ?ResultList{PROP:From} = ''
 
@@ -1313,7 +1344,7 @@ j                    LONG
       DO PreDelete
 
       IF bPlaying > 0
-         thisSortname = UPPER(MacroQueue.szField3) & UPPER(MacroQueue.szField2) & UPPER(MacroQueue.szField3)
+         thisSortname = UPPER(MacroQueue.szField3) & UPPER(MacroQueue.szField1) & UPPER(MacroQueue.szField2)   ! path & filename & ext, as recorded
          bPlaying -= 1
       ELSE
          thisSortname = SearchQueue.ResultQueue.SortName
@@ -1918,6 +1949,7 @@ p           LONG
 szFilename  CSTRING(261)
 Options     &FindStrOptionsGroupType
 dwId        DWORD
+bSearching  BOOL
 rrlQueue    QUEUE(ff_:queue),PRE(RRL)
             END
 
@@ -1940,6 +1972,12 @@ rrlQueue    QUEUE(ff_:queue),PRE(RRL)
       options &= ADDRESS(SearchQueue)
       LOOP i = 1 to RECORDS(SearchQueue)
          GET(SearchQueue,i)
+         cs.wait()                                     ! a tab that is still searching has no results yet
+         ThreadQueue.tabNumber = SearchQueue.tabNumber
+         GET(ThreadQueue,+ThreadQueue.tabNumber)
+         bSearching = CHOOSE(ERRORCODE() = 0)
+         cs.release()
+         IF bSearching THEN CYCLE.
          szFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA) & '\Devuna\KSS\RestorePoint\' & dwId & '\KSS_Results_Tab' & FORMAT(SearchQueue.tabNumber,@N03) & '.rrl'
          CreateRestorePoint(Options, szFilename)
       END
@@ -2445,6 +2483,7 @@ bMatchMode           LONG
 pMatch               LONG
 szMatchText          LIKE(SearchQueue.ResultQueue.Text)
 strOptions           &STRING
+privateResults       &ResultQueueType
 findStrOptions       GROUP(FindStrOptionsGroupType),PRE(fso)
                      END
 thisProcInfo         &PROCESS_INFORMATION
@@ -2483,6 +2522,17 @@ Looped BYTE
     OF ?cmdSearch
       ThisWindow.Update()
        UPDATE()
+       ! F5 and posted EVENT:Accepted get here even while ?cmdSearch is disabled
+       cs.wait()
+       ThreadQueue.tabNumber = ?CurrentSearch{PROP:ChoiceFEQ}
+       GET(ThreadQueue,+ThreadQueue.tabNumber)
+       IF NOT ERRORCODE()
+          cs.release()
+          redoSearch = FALSE                       ! F5/Redo set it before posting; it is not consumed here
+          BEEP
+          RETURN ReturnValue
+       END
+       cs.release()
       
        IF SciControl.GetModify() AND szTitle <> ''
           DO Handle_FileModified
@@ -2569,15 +2619,22 @@ Looped BYTE
                ViewerActive = FALSE
             END
       
+            ! The thread fills a private queue that TakeEvent swaps into the tab on EVENT:THREAD,
+            ! so the list box and the main thread never use a queue that is being written.
+            privateResults &= NEW(ResultQueueType)
+            findStrOptions = SearchQueue
+            findStrOptions.ResultQueue &= privateResults
             strOptions &= NEW STRING(SIZE(FindStrOptionsGroupType))
-            !ASSERT(0,eqDBG & 'NEW FindStrOptions [' & ADDRESS(strOptions) & ']')
-            strOptions = SearchQueue
+            strOptions = findStrOptions
       
             cs.wait()
             ThreadQueue.ID = START(FindStr,25000,strOptions)
             ThreadQueue.tabNumber = SearchQueue.tabNumber
             ThreadQueue.ThreadNo = 0
             ThreadQueue.TargetProcessHandle = kcr_GetCurrentProcess()
+            ThreadQueue.Options &= strOptions     ! keep the START parameter alive until the thread has finished
+            ThreadQueue.Results &= privateResults
+            ThreadQueue.bCloseTab = FALSE
             ADD(ThreadQueue,+ThreadQueue.tabNumber)
             cs.release()
       
@@ -2592,9 +2649,11 @@ Looped BYTE
                PUT(ClockQueue)
             END
       
-            !ASSERT(0,eqDBG & 'DISPOSE FindStrOptions [' & ADDRESS(strOptions) &']')
-            DISPOSE(strOptions)
+            ! strOptions is not disposed here: with the Clarion 12 runtime the new thread may not have
+            ! copied its START parameter yet. It is disposed via ThreadQueue.Options in TakeEvent when the
+            ! search thread posts EVENT:THREAD.
             strOptions &= NULL
+            privateResults &= NULL
             ShowWaitCursor = TRUE
             SETCURSOR(CURSOR:Wait)
             DISABLE(?cmdSearch)
@@ -2822,6 +2881,7 @@ Looped BYTE
       IF PropertiesChanged
          SciControl.ResetPopupMenu()
          LoadLexerProperties(SciControl,SearchQueue.szPropertyFile)
+         bLexerCacheValid = FALSE                  ! options or property files changed
          SciControl.Colourise(0,-1)
          SciControl.MarkerSetBack(markerBookmark, glo:BookmarkBack)
          SciControl.SetSelBack(TRUE,glo:SelectedBack)
@@ -2899,22 +2959,7 @@ Looped BYTE
       ThreadQueue.tabNumber = SearchQueue.tabNumber
       GET(ThreadQueue,ThreadQueue.tabNumber)
       IF NOT ERRORCODE()
-         thisProcInfo &= (INSTANCE(piProcInfo,ThreadQueue.ID))
-         IF NOT thisProcInfo &= NULL
-            cc = kcr_TerminateProcess(thisProcInfo.hProcess,0)
-            !ASSERT(0,eqDBG & 'TerminateProcess called for thread ' & ThreadQueue.ID & ' cc=' & cc)
-            IF cc = 0
-               cc = kcr_FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, 0, kcr_GetLastError(), 0, errMsg, SIZE(errMsg), 0)
-               !ASSERT(0,eqDBG & 'TerminateProcess failed for thread ' & ThreadQueue.ID & ' ' & errMsg)
-            END
-            !YIELD()
-         ELSE
-            !ASSERT(0,eqDBG & 'thisProcInfo is NULL')
-         END
-         ThisCancelFlag &= INSTANCE(CancelFlag,ThreadQueue.ID)
-         ThisCancelFlag = TRUE
-      ELSE
-         !ASSERT(0,eqDBG & ERROR())
+         DO CancelThreadSearch
       END
       cs.Release()
       YIELD()
@@ -2934,8 +2979,33 @@ Looped BYTE
 ThisWindow.TakeCloseEvent PROCEDURE
 
 ReturnValue          BYTE,AUTO
+i                    LONG
+remaining            LONG
 
   CODE
+  ! Searches still running: cancel them and close when the last one has posted EVENT:THREAD
+  ! (TakeEvent). Their threads must not outlive the window, so only a close requested again
+  ! at least CLOSE_FORCE_DELAY later closes while one is still running (the user's way out).
+  IF bForceClose = FALSE
+     cs.wait()
+     remaining = RECORDS(ThreadQueue)
+     IF remaining > 0
+        IF bClosePending = FALSE
+           bClosePending = TRUE
+           closePendingClock = CLOCK()
+           LOOP i = 1 TO remaining
+              GET(ThreadQueue,i)
+              DO CancelThreadSearch
+           END
+        ELSIF (CLOCK() - closePendingClock + 8640000) % 8640000 > CLOSE_FORCE_DELAY
+           bForceClose = TRUE
+        END
+     END
+     cs.release()
+     IF remaining > 0 AND bForceClose = FALSE
+        RETURN Level:Notify
+     END
+  END
   IF SciControl.GetModify() AND szTitle <> ''
      DO Handle_FileModified
   END
@@ -2957,6 +3027,13 @@ MenuSelection        CSTRING(32)
 szSelection          CSTRING(261)
 targetLine           LONG
 scrollDelta          LONG
+finishedTab          LONG
+bCloseFinishedTab    BOOL
+remainingThreads     LONG
+finishedResults      &ResultQueueType
+holdSearch           STRING(SIZE(SearchQueue))
+holdPointer          LONG
+bFinishedTabFound    BOOL
   CODE
   
   LOOP                                                     ! This method receives all events
@@ -2975,22 +3052,50 @@ scrollDelta          LONG
 !    ds_VisibleOnDesktop()
 !  end
     IF INRANGE(EVENT(),EVENT:THREAD,EVENT:THREADLAST)
+       ! The search thread for finishedTab has ended: it no longer touches its queues.
+       finishedTab = EVENT() - EVENT:THREAD
+       bCloseFinishedTab = FALSE
+       finishedResults &= NULL
        cs.wait()
-       ThreadQueue.tabNumber = EVENT() - EVENT:THREAD
+       ThreadQueue.tabNumber = finishedTab
        GET(ThreadQueue,+ThreadQueue.tabNumber)
        IF ~ERRORCODE()
           ClockQueue.tabNumber = ThreadQueue.tabNumber
           GET(ClockQueue,ClockQueue.tabNumber)
           ClockQueue.lClock = ClockQueue.lCLock - CLOCK()
           PUT(ClockQueue)
+          IF NOT ThreadQueue.Options &= NULL
+             DISPOSE(ThreadQueue.Options)            ! the search thread is done with its START parameter
+             ThreadQueue.Options &= NULL
+          END
+          bCloseFinishedTab = ThreadQueue.bCloseTab
+          finishedResults &= ThreadQueue.Results
+          ThreadQueue.Results &= NULL
           DELETE(ThreadQueue)
-          !dbx.Debugout('ThreadQueue for tab ' & ThreadQueue.tabNumber & ' deleted in take event')
-       ELSE
-          !dbx.Debugout('ThreadQueue for tab ' & ThreadQueue.tabNumber & ' not deleted in take event [' & error() & ']')
        END
-       bDoAutoSize = TRUE
-       POST(EVENT:NewSelection,?CurrentSearch,,1)
+       remainingThreads = RECORDS(ThreadQueue)
        cs.release()
+
+       IF NOT finishedResults &= NULL
+          DO SwapInFinishedResults
+       END
+       IF bClosePending = TRUE
+          IF remainingThreads = 0
+             bForceClose = TRUE
+             POST(EVENT:CloseWindow)
+          END
+       ELSIF bCloseFinishedTab = TRUE
+          DO CloseFinishedTab
+       ELSIF finishedTab = ?CurrentSearch{PROP:ChoiceFEQ}
+          bDoAutoSize = TRUE
+          POST(EVENT:NewSelection,?CurrentSearch,,1)
+       ELSE
+          AutoSizeQueue.tabNumber = finishedTab          ! autosize when that tab is shown
+          GET(AutoSizeQueue,AutoSizeQueue.tabNumber)
+          IF ERRORCODE()
+             ADD(AutoSizeQueue,+AutoSizeQueue.tabNumber)
+          END
+       END
   
     ELSIF INRANGE(EVENT(),EVENT:PROGRESS,EVENT:PROGRESSLAST)
        feqProgress = EVENT() - EVENT:PROGRESS
@@ -3061,6 +3166,77 @@ scrollDelta          LONG
   END
   ReturnValue = Level:Fatal
   RETURN ReturnValue
+!-----------------------------------------------------------------------------
+! Puts the queue the finished thread filled into its tab and disposes the tab's
+! old queue. Works on whichever tab finished; the current SearchQueue record and
+! buffer are restored afterwards.
+SwapInFinishedResults ROUTINE
+      holdSearch = SearchQueue
+      holdPointer = POINTER(SearchQueue)
+      SearchQueue.tabNumber = finishedTab
+      GET(SearchQueue,SearchQueue.tabNumber)
+      bFinishedTabFound = CHOOSE(ERRORCODE() = 0)
+      IF bFinishedTabFound = TRUE
+         IF finishedTab = ?CurrentSearch{PROP:ChoiceFEQ}
+            ?ResultList{PROP:From} = ''
+         END
+         IF NOT SearchQueue.ResultQueue &= NULL
+            FREE(SearchQueue.ResultQueue)
+            DISPOSE(SearchQueue.ResultQueue)
+         END
+         SearchQueue.ResultQueue &= finishedResults
+         PUT(SearchQueue)
+      ELSE
+         FREE(finishedResults)                     ! the tab is gone
+         DISPOSE(finishedResults)
+         finishedResults &= NULL
+      END
+      IF INRANGE(holdPointer,1,RECORDS(SearchQueue))
+         GET(SearchQueue,holdPointer)
+      END
+      SearchQueue = holdSearch
+      IF bFinishedTabFound = TRUE
+         IF SearchQueue.tabNumber = finishedTab
+            SearchQueue.ResultQueue &= finishedResults
+         END
+         IF finishedTab = ?CurrentSearch{PROP:ChoiceFEQ}
+            ?ResultList{PROP:From} = finishedResults
+            AutoSizer.Reset(?ResultList,finishedResults)
+         END
+      END
+      finishedResults &= NULL
+   EXIT
+!-----------------------------------------------------------------------------
+! Closes finishedTab, whose close was requested while its search was running.
+CloseFinishedTab ROUTINE
+   DATA
+shownTab    LONG
+   CODE
+      shownTab = ?CurrentSearch{PROP:ChoiceFEQ}
+      IF finishedTab <> shownTab
+         PUT(SearchQueue)                          ! keep the shown tab's record before switching
+         SearchQueue.tabNumber = finishedTab
+         GET(SearchQueue,SearchQueue.tabNumber)
+         IF ERRORCODE()
+            SearchQueue.tabNumber = shownTab
+            GET(SearchQueue,SearchQueue.tabNumber)
+            EXIT
+         END
+         ?CurrentSearch{PROP:ChoiceFEQ} = finishedTab
+      END
+      DO HandleCloseTab
+      IF finishedTab = ?Search1                    ! tab 1 is reset, not closed, and a new search is posted for it:
+         PUT(SearchQueue)                          ! stay on it so that search targets tab 1
+      ELSIF finishedTab <> shownTab                ! back to the tab the user was viewing
+         SearchQueue.tabNumber = shownTab
+         GET(SearchQueue,SearchQueue.tabNumber)
+         IF NOT ERRORCODE()
+            ?CurrentSearch{PROP:ChoiceFEQ} = shownTab
+         END
+      END
+      POST(EVENT:NewSelection,?CurrentSearch)
+   EXIT
+
 
 
 ThisWindow.TakeFieldEvent PROCEDURE
@@ -3404,6 +3580,7 @@ ThisWindow.TakeNewSelection PROCEDURE
 ReturnValue          BYTE,AUTO
 
 n      LONG
+bTabSearching BOOL
 Looped BYTE
   CODE
   LOOP                                                     ! This method receives all NewSelection events
@@ -3466,6 +3643,12 @@ Looped BYTE
       
          AutoSizer.Reset(?ResultList,SearchQueue.ResultQueue)
       
+         AutoSizeQueue.tabNumber = ?CurrentSearch{PROP:ChoiceFEQ}
+         GET(AutoSizeQueue,AutoSizeQueue.tabNumber)
+         IF NOT ERRORCODE()
+            bDoAutoSize = TRUE
+            DELETE(AutoSizeQueue)
+         END
          IF glo:AutoSizeResultColumns = TRUE AND bDoAutoSize = TRUE
             AutoSizer.ResizeAll(?ResultList)
             SearchQueue.szListBoxFormat = ?ResultList{PROP:Format}
@@ -3478,7 +3661,9 @@ Looped BYTE
          cs.Wait()
          ThreadQueue.tabNumber = ?CurrentSearch{PROP:ChoiceFEQ}
          GET(ThreadQueue,+ThreadQueue.tabNumber)
-         IF NOT ERRORCODE()
+         bTabSearching = CHOOSE(ERRORCODE() = 0)
+         cs.Release()                              ! not held across the dialog below: finishing workers take cs
+         IF bTabSearching = TRUE
             !dbx.Debugout('ThreadQueue for tab ' & ThreadQueue.tabNumber & ' found in take new selection')
             ShowWaitCursor = TRUE
             SETCURSOR(CURSOR:Wait)
@@ -3539,7 +3724,6 @@ Looped BYTE
             END
          END
          PUT(SearchQueue)
-         cs.Release()
       
          DO HandleNewSelection
          DISPLAY()
@@ -3730,6 +3914,8 @@ buttonPressed        LONG
              Window{PROP:Timer} = 0
              DO RefreshEditPane
           END
+       ELSIF NOT EditPaneRefreshPending
+          Window{PROP:Timer} = 0                    ! focus is elsewhere and nothing is pending: stop the 20 Hz navigation timer
        END
     OF EVENT:CreateRestorePoint
        DO CreateRestorePoint
@@ -3858,8 +4044,16 @@ bInOmit              BOOL(FALSE)
 bInLoop              BOOL(FALSE)
 bInRegion            BOOL(FALSE)
 szOmitToken          CSTRING(265)
+lineText             CSTRING(2049)                         ! the line without trailing spaces (one pass over the 2048-byte buffer)
+lineUpper            CSTRING(2049)
+saveModMask          LONG
 
    CODE
+      ! No SCN_MODIFIED notifications while the fold levels are set. Scintilla 3.0.1 sends one per
+      ! SetFoldLevel (as SC_MOD_CHANGEFOLD + SC_MOD_CHANGEMARKER), each handled by the window's event
+      ! loop: that was about two thirds of the time to open a file in the viewer. Text is not changed here.
+      saveModMask = SciControl.GetModEventMask()
+      SciControl.SetModEventMask(0)
       thisFoldLevel = 1024
       thisFile = SearchQueue.ResultQueue.SortName
       thisLine = 0
@@ -3873,9 +4067,11 @@ szOmitToken          CSTRING(265)
                BREAK
             ELSE
                thisLine += 1
+               lineText = CLIP(AsciiFile.Buffer)        ! the string functions below work on this short copy
+               lineUpper = UPPER(lineText)
                IF bInOmit = TRUE
                   SciControl.SetFoldLevel(thisLine-1,thisFoldLevel)
-                  thisText = UPPER(AsciiFile.Buffer)
+                  thisText = lineUpper
                   IF INSTRING(szOmitToken,thisText,1)
                      bInOmit = FALSE
                      szOmitToken = ''
@@ -3884,7 +4080,7 @@ szOmitToken          CSTRING(265)
                   CYCLE
                END
 
-               thisText = UPPER(CLIP(LEFT(AsciiFile.Buffer)))
+               thisText = CLIP(LEFT(lineUpper))
                IF thisText[1] = '!'
                   IF INSTRING('!REGION',thisText,1)
                      SciControl.SetFoldLevel(thisLine-1,BOR(thisFoldLevel,SC_FOLDLEVELHEADERFLAG))
@@ -3902,16 +4098,16 @@ szOmitToken          CSTRING(265)
                END
 
                !remove comment
-               IF AsciiFile.Buffer[1] = ' '
+               IF lineText = '' OR lineText[1] = ' '
                   thisText = ' '
                ELSE
                   thisText = ''
                END
-               i = INSTRING('!',AsciiFile.Buffer)
+               i = INSTRING('!',lineText)
                IF i
-                  thisText = thisText & UPPER(CLIP(LEFT(AsciiFile.Buffer[1 : i-1])))
+                  thisText = thisText & CLIP(LEFT(lineUpper[1 : i-1]))
                ELSE
-                  thisText = thisText & UPPER(CLIP(LEFT(AsciiFile.Buffer)))
+                  thisText = thisText & CLIP(LEFT(lineUpper))
                END
 
 
@@ -3998,7 +4194,7 @@ szOmitToken          CSTRING(265)
                   thisFoldLevel += 1
                ELSIF thisText[1 : 3] = ' IF'
                   SciControl.SetFoldLevel(thisLine-1,BOR(thisFoldLevel,SC_FOLDLEVELHEADERFLAG))
-                  IF thisText[LEN(thisText)] = '.' OR thisText[LEN(thisText)-3 : LEN(thisText)] = ';END'
+                  IF thisText[LEN(thisText)] = '.' OR (LEN(thisText) >= 4 AND thisText[LEN(thisText)-3 : LEN(thisText)] = ';END')   ! a bare ' IF' would slice from 0
                      !don't bump level
                   ELSE
                      thisFoldLevel += 1
@@ -4156,6 +4352,7 @@ szOmitToken          CSTRING(265)
       ELSE
          !error opening file
       END
+      SciControl.SetModEventMask(saveModMask)
       RETURN
 ConfirmAutoSave PROCEDURE() !,LONG
 ReturnValue                   LONG(0)
@@ -4258,12 +4455,16 @@ szProperty      CSTRING('fold')
 szPropertyValue CSTRING(2)
   CODE
   cc = SELF.GetProperty(szProperty,szPropertyValue)
-  SELF.bFoldMargin = 1 - szPropertyValue
-  sciControl.foldMargin()
+  ! FoldMargin toggles the margin to match the 'fold' property (and resets fold.compact). Skip it on a
+  ! cached-lexer open when they already match: turning the margin off walks every line (EnsureVisible).
+  IF bLexerCacheValid = FALSE OR SELF.bFoldMargin <> CHOOSE(szPropertyValue = '1')
+     SELF.bFoldMargin = 1 - szPropertyValue
+     sciControl.foldMargin()
+  END
   PARENT.Colourise(lStart,lEnd)
   !CASE UPPER(SearchQueue.ResultQueue.szExtension)
   !  OF '.CLA' OROF '.CLW' OROF '.TPL' OROF '.TPW'
-  IF SELF.GetLexer() = SCLEX_CLWNOCASE
+  IF SELF.GetLexer() = SCLEX_CLWNOCASE AND SELF.bFoldMargin = TRUE   ! fold levels are only used with the fold margin
      FixFileFolding()
   END
   Window{PROP:Color} = SELF.StyleGetBack(32)
@@ -4476,7 +4677,6 @@ szLexer        CSTRING(33)
      END
   
      IF MATCH(UPPER(szFileType),UPPER(String2),Match:Regular)
-        SELF.SetDefaultStyles()
         CASE FileExtensionQueue.nLexer
           OF SCLEX_MSSQL OROF SCLEX_MYSQL OROF SCLEX_SQL
              IF FileExtensionQueue.Extension = '*.SQL'
@@ -4489,7 +4689,16 @@ szLexer        CSTRING(33)
                 END
              END
         END
-        SELF.SetLexer(FileExtensionQueue.nLexer,FileExtensionQueue.FileMode)
+        IF bLexerCacheValid = TRUE AND LexerCacheLexer = FileExtensionQueue.nLexer AND LexerCacheFile = FileExtensionQueue.FileMode AND SELF.GetLexer() = FileExtensionQueue.nLexer
+           SearchQueue.szPropertyFile = FileExtensionQueue.FileMode   ! same lexer and styles as the previous file: no reload, only restyle
+           SELF.Colourise(0,-1)
+        ELSE
+           SELF.SetDefaultStyles()
+           SELF.SetLexer(FileExtensionQueue.nLexer,FileExtensionQueue.FileMode)
+           LexerCacheLexer = FileExtensionQueue.nLexer
+           LexerCacheFile = FileExtensionQueue.FileMode
+           bLexerCacheValid = CHOOSE(bPropertiesLoaded = TRUE AND SELF.GetLexer() = FileExtensionQueue.nLexer AND SearchQueue.szPropertyFile = FileExtensionQueue.FileMode)   ! not when the load failed and fell back to text
+        END
         BREAK
      ELSE
         !cycle
@@ -4497,7 +4706,6 @@ szLexer        CSTRING(33)
   END
   
   IF i > RECORDS(FileExtensionQueue)
-     SELF.SetDefaultStyles()
      defaultLexer = GetPropertyFileLexer(glo:szDefaultPropertyFile)
      CASE defaultLexer
        OF 'clarion'
@@ -4513,7 +4721,16 @@ szLexer        CSTRING(33)
             nLexer = SCLEX_NULL
          END
      END
-     SELF.SetLexer(defaultLexer,glo:szDefaultPropertyFile)
+     IF bLexerCacheValid = TRUE AND LexerCacheLexer = nLexer AND LexerCacheFile = glo:szDefaultPropertyFile AND SELF.GetLexer() = nLexer
+        SearchQueue.szPropertyFile = glo:szDefaultPropertyFile
+        SELF.Colourise(0,-1)
+     ELSE
+        SELF.SetDefaultStyles()
+        SELF.SetLexer(nLexer,glo:szDefaultPropertyFile)   ! was SetLexer(defaultLexer,...): the lexer name, which is not a lexer number
+        LexerCacheLexer = nLexer
+        LexerCacheFile = glo:szDefaultPropertyFile
+        bLexerCacheValid = CHOOSE(bPropertiesLoaded = TRUE AND SELF.GetLexer() = nLexer AND SearchQueue.szPropertyFile = glo:szDefaultPropertyFile)
+     END
      FileExtensionQueue.FileMode = glo:szDefaultPropertyFile
   END
   
@@ -4537,7 +4754,7 @@ szProperty  CSTRING('fold')
 szValue     CSTRING('0')
   CODE
   PARENT.SetTextLexer
-  SELF.SetDefaultStyles()
+  SELF.SetDefaultStyles()                          ! also clears the lexer cache
   SearchQueue.szPropertyFile = 'text'
   IF LoadLexerProperties(SELF,'text')
      SELF.SetProperty(szProperty, szValue)
@@ -4633,6 +4850,10 @@ szLexer              CSTRING(33)
               SELF.FoldAll()
            OF 'FoldMargin'
               SELF.FoldMargin()
+              bLexerCacheValid = FALSE                 ! the next file reloads 'fold' from its properties, as before
+              IF SELF.bFoldMargin = TRUE AND SELF.GetLexer() = SCLEX_CLWNOCASE
+                 FixFileFolding()                  ! not computed while the margin was off
+              END
            OF 'Find'
               SELF.SetFindGroup(SearchQueue.FindGroup)
               SELF.SearchAsk(TRUE,oHH)
@@ -4653,6 +4874,7 @@ szLexer              CSTRING(33)
               glo:bHotSpotsEnabled = 1 - glo:bHotSpotsEnabled
               SELF.Popup.SetIcon('HotSpotsEnabled',CHOOSE(glo:bHotSpotsEnabled,'Checkbox_on.ico','Checkbox_off.ico'))
               LoadLexerProperties(SELF,SearchQueue.szPropertyFile)
+              bLexerCacheValid = FALSE
            OF 'AutoSave'
               glo:bAutoSave = 1 - glo:bAutoSave
               SELF.Popup.SetIcon('AutoSave',CHOOSE(glo:bAutoSave,'Checkbox_on.ico','Checkbox_off.ico'))
@@ -5509,17 +5731,21 @@ szProperty           CSTRING(256)
 szPropertyValue      CSTRING(256)
 
   CODE
+      bLexerCacheValid = FALSE                     ! SetLexerType sets it again after its own load
+      bPropertiesLoaded = FALSE
       IF SELF.GetLexer() <> Lexer
          SELF.SetLexer(Lexer)
          SearchQueue.szPropertyFile = PropertyFile
          IF LoadLexerProperties(SELF,PropertyFile)
             SELF.SetTextLexer()
          ELSE
+            bPropertiesLoaded = TRUE
             SELF.Colourise(0,-1)
          END
       ELSE
          SearchQueue.szPropertyFile = PropertyFile
          IF NOT LoadLexerProperties(SELF,PropertyFile)
+            bPropertiesLoaded = TRUE
             SELF.Colourise(0,-1)
          END
       END
@@ -5528,6 +5754,7 @@ szPropertyValue      CSTRING(256)
 SciControl.SetDefaultStyles PROCEDURE()
 
   CODE
+      bLexerCacheValid = FALSE                     ! styles reset: the next file reloads its properties
   !# Global default styles for all languages
   !# Default
   !style.*.32=$(font.base)

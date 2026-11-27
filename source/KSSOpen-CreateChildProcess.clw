@@ -51,6 +51,8 @@ oHH           &tagHTMLHelp
 !szCmdline   CSTRING('findstr /s /i /n /p "keystone" "*.inc *.clw"')
 siStartInfo LIKE(STARTUPINFOTYPE)
 bSuccess    BOOL(FALSE)
+errCode     LONG
+errMsg      CSTRING(512)
 
   CODE
     
@@ -69,6 +71,11 @@ bSuccess    BOOL(FALSE)
       siStartInfo.dwFlags = BOR(siStartInfo.dwFlags,STARTF_USESTDHANDLES)
       siStartInfo.dwFlags = BOR(siStartInfo.dwFlags,STARTF_USESHOWWINDOW)
       siStartInfo.wShowWindow = SW_HIDE
+      ! Another search thread's findstr must not inherit this search's pipe ends (it would keep
+      ! our pipe open until it exits), so they are inheritable only during this CreateProcess.
+      pipeCs.Wait()
+      kcr_SetHandleInformation(g_hChildStd_OUT_Wr, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT)
+      kcr_SetHandleInformation(g_hChildStd_IN_Rd, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT)
       ! Create the child process.
       bSuccess = kcr_CreateProcess(0,              |  ! application name
                                    szCmdline,      |  ! command line
@@ -80,6 +87,12 @@ bSuccess    BOOL(FALSE)
                                    0,              |  ! use parent's current directory
                                    siStartInfo,    |  ! STARTUPINFO pointer
                                    piProcInfo)        ! receives PROCESS_INFORMATION
+      IF bSuccess = FALSE
+         errCode = kcr_GetLastError()
+      END
+      kcr_SetHandleInformation(g_hChildStd_OUT_Wr, HANDLE_FLAG_INHERIT, 0)
+      kcr_SetHandleInformation(g_hChildStd_IN_Rd, HANDLE_FLAG_INHERIT, 0)
+      pipeCs.Release()
 
       ! If an error occurs, exit the application.
       IF bSuccess = TRUE
@@ -89,6 +102,12 @@ bSuccess    BOOL(FALSE)
          !kcr_CloseHandle(piProcInfo.hProcess)
          kcr_CloseHandle(piProcInfo.hThread)
       ELSE
-         !MESSAGE('CreateProcess')
+         !findstr never started: say why instead of returning an empty result list
+         errMsg = ''
+         IF kcr_FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, 0, errCode, 0, errMsg, SIZE(errMsg), 0) = 0
+            errMsg = 'Windows error ' & errCode
+         END
+         MESSAGE('KSS could not start findstr.||' & CLIP(errMsg) & '||Command line:|' & SUB(szCmdLine,1,512), |
+                 'Search failed', ICON:Exclamation)
       END
       RETURN

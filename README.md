@@ -24,15 +24,19 @@ Get installers here: https://github.com/mriffey/KSSOpen/releases
 
 **DEPENDENCIES**
 
-Without the list of tools below, you will not be able to build this source. You can remove the references to xFiles and StringTheory. Anyone with a basic level of experience with Clarion will likely be able to do this. Note that the dependency on Capesoft WinEvent was removed - which means the exe will prevent a reboot / shutdown until code is added to do this without WinEvent. 
+Without the list of tools below, you will not be able to build this source. Note that the dependency on Capesoft WinEvent was removed - which means the exe will prevent a reboot / shutdown until code is added to do this without WinEvent. 
 
 Required tools / code:
 
 - This repo
-- Clarion 10 or later (installer version is based on Clarion 11) 
-- Capesoft xFiles
-- Capesoft StringTheory
-- Several of Mark Goldberg's classes from https://github.com/markgoldberg
+- Clarion 10 or later (installer version is based on Clarion 11; builds with Clarion 12)
+- Capesoft StringTheory (tested with 3.88)
+
+The dependencies on Capesoft xFiles and UltimateDebug have been removed. The cwproj.FileList.xml search option now reads the file with StringTheory, and debug output goes through a small local class (`libsrc\win\KssDebug.inc`) that writes to `OutputDebugString` (view it with DebugView). The classes from Mark Goldberg (https://github.com/markgoldberg) that KSS uses are included in `libsrc\win`.
+
+**Building with Clarion 12**
+
+`source\Clarion120.red` adds the repo's `libsrc\win`, `lib` and `images` folders to the Clarion 12 redirection, so no paths need editing. (`Clarion100.RED` is the older Clarion 10 file and still points at `c:\projects\KSSOpen`.) Keep the clone in a short folder path: very deep paths can make the Clarion compiler fail with an internal error.
 
 **WARNING** This repo uses Git LFS. See https://git-lfs.github.com/ for details.
 

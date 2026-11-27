@@ -2,7 +2,6 @@
 
 
   INCLUDE('cwHH.INC'),ONCE
-xFiles:TemplateVersion equate('3.25')
 StringTheory:TemplateVersion equate('3.38')
 !region Notices
 ! ================================================================================
@@ -125,8 +124,12 @@ EVENT:FoldMarginClick            EQUATE(EVENT:Last)
 
 COLOR_GRADIENTACTIVECAPTION      EQUATE(27)
 COLOR_GRADIENTINACTIVECAPTION    EQUATE(28)
+! Clarion 12 equates.clw defines these two (same values); Clarion 10 equates.clw does not.
+! _C120_ is predefined by the Clarion 12 compiler (and later), so older versions still get them.
+  OMIT('**C120**', _C120_)
 COLOR:GRADIENTACTIVECAPTION      EQUATE(08000001BH)
 COLOR:GRADIENTINACTIVECAPTION    EQUATE(08000001CH)
+  !**C120**
 
 PROCESS_TERMINATE                EQUATE(00001h)
 PROCESS_CREATE_THREAD            EQUATE(00002h)
@@ -410,8 +413,7 @@ CtrlShiftBar   EQUATE(988)
    INCLUDE('KEYCODES.CLW'),ONCE
    INCLUDE('SPECIALFOLDER.INC'),ONCE
    INCLUDE('ABFUZZY.INC'),ONCE
-   INCLUDE('UltimateDebug.INC'),ONCE 
-   INCLUDE('xfiles.inc'),ONCE
+   INCLUDE('KssDebug.inc'),ONCE
    INCLUDE('StringTheory.Inc'),ONCE
 !    Include('WinEvent.Inc'),Once
    INCLUDE('ABEIP.INC')
@@ -576,6 +578,7 @@ glo:szNull           CSTRING(2)
 glo:bInstallOnExit   BOOL
 RegisteredTo         CSTRING(29)
 cs                   CriticalSection
+pipeCs               CriticalSection                       ! serializes CreateProcess while a search's pipe ends are inheritable
 CurrentSearch        LONG
 g_hChildStd_IN_Rd    HANDLE,THREAD
 g_hChildStd_IN_Wr    HANDLE,THREAD
@@ -583,7 +586,8 @@ g_hChildStd_OUT_Rd   HANDLE,THREAD
 g_hChildStd_OUT_Wr   HANDLE,THREAD
 piProcInfo           LIKE(PROCESS_INFORMATION),THREAD
 CancelFlag           BYTE,THREAD
-glo:findstrCommandLine CSTRING(261)
+glo:findstrCommandLine CSTRING(8193)
+glo:ThreadCmdLine    CSTRING(8193),THREAD                  ! the search thread's own command line (glo:findstrCommandLine is shared by all tabs)
 glo:SplitterOrientation BYTE(1)
 glo:SplitX           LONG
 glo:SplitY           LONG
@@ -646,6 +650,9 @@ ThreadNo               LONG
 TargetProcessHandle    LONG
 tabNumber              LONG
 lClock                 LONG
+Options                &STRING                   ! START parameter for FindStr; disposed when the thread posts EVENT:THREAD
+Results                &ResultQueueType          ! queue the thread fills; swapped into the tab when the thread posts EVENT:THREAD
+bCloseTab              BYTE                      ! close the tab once the thread has finished
                      END
 STDOUT_Queue         QUEUE(STDOUTQueueType),PRE(SQ),THREAD
                      END
@@ -685,18 +692,7 @@ szExcludeMask                 CSTRING(256)
                            END
                         END
 CLSkel_TplVersion    CSTRING('v17.09.06.1, Released 2017-09-06')
-udb_Settings                GROUP,PRE(udb_Settings)
-DebugOff                            BOOL(FALSE)
-DebugPrefix                         STRING(20)
-SaveToFile                          BOOL(FALSE)
-ASCIIFileName                       STRING(100)
-DebugNoCR                           BYTE(FALSE)
-LineWrap                            BYTE(TRUE)
-ModuleName                          STRING(100)
-AppName                             STRING(100)
-Modified                            STRING(26)
-                            END
-UD                   UltimateDebug
+UD                   KssDebug                              ! Debug output via OutputDebugString (see libsrc\win\KssDebug.inc)
 WE::MustClose       long
 WE::CantCloseNow    long
 
@@ -723,13 +719,6 @@ VCRRequest           LONG(0),THREAD                        ! Set to the request 
   svSpecialFolder.CreateDirIn(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS' )
   INIMgr.Init(svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS') & '\' & 'kss.INI', NVD_INI)
 !  DctInit()
-    udb_Settings.DebugOff      =  0
-    udb_Settings.DebugPrefix   =  '!'
-    udb_Settings.SaveToFile    =  0
-    udb_Settings.ASCIIFileName =  'DebugLog.txt'
-    udb_Settings.DebugNoCR     =  1
-    udb_Settings.LineWrap      =  0
-    UD.INIT('global',udb_settings)
   SYSTEM{PROP:Icon} = '~kss.ico'
   SyncOptionsFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA, 'Devuna' & '\' & 'KSS\pattern.dat')
   INIMgr.Fetch('Global','AllowMultipleInstances',glo:AllowMultipleInstances)
