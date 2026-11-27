@@ -59,9 +59,14 @@ statement               &CSTRING
 clText               &CSTRING
 i                    LONG
 j                    LONG
+AltQueue             QUEUE                                 ! the | alternatives of szPattern, as FindStr searches them
+alt                    CSTRING(1025)
+                     END
+altIndex             LONG
 
   CODE
     
+      DO SplitPattern
       CommentStyle = GetCommentStyle(szExtension)
       clText &= NEW CSTRING(SIZE(szText)+1)
       clText = szText
@@ -286,14 +291,69 @@ LookForMatch   ROUTINE
          szMatchText = StatementQueue.statement
       END
 
-      IF BAND(bMatchMode,Match:Regular)   !regular expression
-         pMatch = MATCH(szMatchText,szPattern,bMatchMode)
-      ELSE
-         IF BAND(bMatchMode,Match:NoCase)
-            pMatch = INSTRING(UPPER(szPattern),UPPER(szMatchText),1)
+      ! A match on any alternative counts (KSS searches A|B as A or B)
+      pMatch = 0
+      LOOP altIndex = 1 TO RECORDS(AltQueue)
+         GET(AltQueue,altIndex)
+         IF BAND(bMatchMode,Match:Regular)   !regular expression
+            pMatch = MATCH(szMatchText,AltQueue.alt,bMatchMode)
          ELSE
-            pMatch = INSTRING(szPattern,szMatchText,1)
+            IF BAND(bMatchMode,Match:NoCase)
+               pMatch = INSTRING(UPPER(AltQueue.alt),UPPER(szMatchText),1)
+            ELSE
+               pMatch = INSTRING(AltQueue.alt,szMatchText,1)
+            END
          END
+         IF pMatch
+            BREAK
+         END
+      END
+   EXIT
+!-----------------------------------------------------------------------------
+! Splits szPattern into AltQueue the same way SavePatternToFile builds the findstr /g: file:
+! a single | separates alternatives and || stands for a literal |. Empty alternatives are skipped.
+SplitPattern   ROUTINE
+   DATA
+i        LONG
+j        LONG
+   CODE
+      FREE(AltQueue)
+      i = 1
+      j = INSTRING('|',szPattern,1,i)
+      LOOP WHILE j
+         IF j < LEN(szPattern)
+            IF szPattern[j+1] = '|'
+               j = INSTRING('|',szPattern,1,j+2)
+            ELSE
+               AltQueue.alt = szPattern[i : j - 1]
+               DO AddAlternative
+               i = j + 1
+               j = INSTRING('|',szPattern,1,i)
+            END
+         ELSE
+            BREAK
+         END
+      END
+      IF i <= LEN(szPattern)
+         AltQueue.alt = szPattern[i : LEN(szPattern)]
+         DO AddAlternative
+      END
+   EXIT
+AddAlternative ROUTINE
+   DATA
+n        LONG
+p        LONG
+   CODE
+      n = 1
+      p = INSTRING('||',AltQueue.alt,1,n)
+      LOOP WHILE p
+         AltQueue.alt = AltQueue.alt[1 : p] & AltQueue.alt[p+2 : LEN(AltQueue.alt)]
+         n = p + 1
+         p = INSTRING('||',AltQueue.alt,1,n)
+      END
+      ReplaceChr(AltQueue.alt,'<0A7h>','''')        ! patterns saved to the INI store ' as § (see SaveSearchParameters)
+      IF AltQueue.alt <> ''
+         ADD(AltQueue)
       END
    EXIT
 !!! <summary>

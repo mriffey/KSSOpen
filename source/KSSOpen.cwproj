@@ -23,7 +23,7 @@
     <OutputPath>bin\</OutputPath>
     <GenerateMap>True</GenerateMap>
     <line_numbers>False</line_numbers>
-    <DefineConstants>xFilesLinkMode=&gt;1%3bxFilesDllMode=&gt;0%3b_XFILES_=&gt;1%3bStringTheoryLinkMode=&gt;1%3bStringTheoryDllMode=&gt;0%3bMD5=&gt;0%3b_ABCDllMode_=&gt;0%3b_ABCLinkMode_=&gt;1%3b_SCIDllMode_=&gt;0%3b_SCILinkMode_=&gt;1</DefineConstants>
+    <DefineConstants>StringTheoryLinkMode=&gt;1%3bStringTheoryDllMode=&gt;0%3bMD5=&gt;0%3b_ABCDllMode_=&gt;0%3b_ABCLinkMode_=&gt;1%3b_SCIDllMode_=&gt;0%3b_SCILinkMode_=&gt;1</DefineConstants>
     <warnings>on</warnings>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
@@ -34,7 +34,7 @@
     <check_index>False</check_index>
     <GenerateMap>True</GenerateMap>
     <line_numbers>False</line_numbers>
-    <DefineConstants>xFilesLinkMode=&gt;1%3bxFilesDllMode=&gt;0%3bStringTheoryLinkMode=&gt;1%3bStringTheoryDllMode=&gt;0%3bMD5=&gt;0%3b_ABCDllMode_=&gt;0%3b_ABCLinkMode_=&gt;1%3b_SCIDllMode_=&gt;0%3b_SCILinkMode_=&gt;1%3b</DefineConstants>
+    <DefineConstants>StringTheoryLinkMode=&gt;1%3bStringTheoryDllMode=&gt;0%3bMD5=&gt;0%3b_ABCDllMode_=&gt;0%3b_ABCLinkMode_=&gt;1%3b_SCIDllMode_=&gt;0%3b_SCILinkMode_=&gt;1%3b</DefineConstants>
     <OutputPath>bin\release\</OutputPath>
     <warnings>on</warnings>
   </PropertyGroup>
@@ -184,7 +184,70 @@
       <ProjectGenerated>True</ProjectGenerated>
     </None>
   </ItemGroup>
+  <!-- Runtime files KSS needs next to the exe (Scintilla editor and its lexer settings). They are tracked in
+       bin\ (the Debug output folder); copy them for Release so a fresh clone runs from bin\release\. -->
+  <ItemGroup Condition=" '$(Configuration)' == 'Release' ">
+    <None Include="bin\SciLexer.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\msvcr70.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\clarion.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\cpp.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\csharp.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\css.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\html.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\java.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\mssql.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\mysql.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\plsql.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\python.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\sql.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\text.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\vb.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\vbscript.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="bin\xml.properties">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
   <Import Project="$(ClarionBinPath)\SoftVelocity.Build.Clarion.targets" />
+  <!-- Replaces the PreBuildEvent target from SoftVelocity.Build.Clarion.targets (the last definition of a
+       target wins, in every MSBuild version the Clarion IDE may use). The original runs the pre-build step
+       with OutputPath as its working directory, and Release's bin\release\ does not exist in a fresh clone
+       (it is not tracked), so the build stopped with MSB6003. Create the folder first and use a full path. -->
+  <Target Name="PreBuildEvent" Condition="'$(PreBuildEvent)'!=''" DependsOnTargets="$(PreBuildEventDependsOn)">
+    <MakeDir Directories="$(MSBuildProjectDirectory)\$(OutputPath)" Condition="!Exists('$(MSBuildProjectDirectory)\$(OutputPath)')" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)\$(OutputPath)" Command="$(PreBuildEvent)" />
+  </Target>
   <PropertyGroup>
     <PreBuildEvent>$(SolutionDir)bin\VersionMe.exe PROJECT=$(OutputName) BINARYTYPE=$(OutputType) APPFOLDER=$(SolutionDir)</PreBuildEvent>
   </PropertyGroup>

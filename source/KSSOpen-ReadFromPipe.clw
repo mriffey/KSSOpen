@@ -144,17 +144,20 @@ w             WINDOW,AT(0,0,10,10),TIMER(1)
              POST(EVENT:User,,param.ParentThread,0)
              BREAK
           OF EVENT:Timer
-             CLEAR(chBuf,-1)
-             bSuccess = kcr_ReadFile( param.ParentPipe, ADDRESS(chBuf), BUFSIZE, ADDRESS(dwRead), 0)
-             IF bSuccess = FALSE OR dwRead = 0
-                w{PROP:timer} = 0
+             ! Read until findstr closes its end of the pipe (ReadFile then fails or returns 0 bytes).
+             ! Reading in a loop rather than once per timer tick keeps the pipe drained, so findstr is
+             ! never left waiting on a full pipe between ticks. Cancel terminates findstr, which ends the loop.
+             w{PROP:timer} = 0
+             LOOP
+                CLEAR(chBuf,-1)
+                bSuccess = kcr_ReadFile( param.ParentPipe, ADDRESS(chBuf), BUFSIZE, ADDRESS(dwRead), 0)
                 param.ParentQueue.Buffer = chBuf
                 ADD(param.ParentQueue)
-                POST(EVENT:CloseWindow)
-             ELSE
-                param.ParentQueue.Buffer = chBuf
-                ADD(param.ParentQueue)
+                IF bSuccess = FALSE OR dwRead = 0
+                   BREAK
+                END
              END
+             POST(EVENT:CloseWindow)
         END
      END
      CLOSE(w)

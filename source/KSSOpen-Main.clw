@@ -576,6 +576,7 @@ SaveSearchParameters ROUTINE
    DATA
 n                 LONG
 LocationColWidth  LONG
+szIniPattern      LIKE(SearchQueue.szPattern)
 
    CODE
       INIMgr.Update('Search Options','bMatchPatternStartOfLine',SearchQueue.bMatchPatternStartOfLine)
@@ -589,9 +590,12 @@ LocationColWidth  LONG
       INIMgr.Update('Search Options','bExcludeComments',SearchQueue.bExcludeComments)
       !INIMgr.Update('Search Options','bIncludeBinary',SearchQueue.bIncludeBinary)
 
-      ReplaceChr(SearchQueue.szPattern,'''','§')
+      ! Swap ' for § only in the copy written to the INI. Changing SearchQueue.szPattern itself left the
+      ! tab's pattern with §, so the Cmt button (DeleteCommentLines) never matched patterns with an apostrophe.
+      szIniPattern = SearchQueue.szPattern
+      ReplaceChr(szIniPattern,'''','§')
       !ReplaceChr(SearchQueue.szPattern,'''','<A7h>')  ! MR 20190217 avoid losing this important hex char to random translation. 
-      INIMgr.Update('Search Options','szPattern',SearchQueue.szPattern)
+      INIMgr.Update('Search Options','szPattern',szIniPattern)
 
       INIMgr.Update('Search Options','szSearchPath',SearchQueue.szSearchPath)
       INIMgr.Update('Search Options','szFileMask',SearchQueue.szFileMask)
@@ -1313,7 +1317,7 @@ j                    LONG
       DO PreDelete
 
       IF bPlaying > 0
-         thisSortname = UPPER(MacroQueue.szField3) & UPPER(MacroQueue.szField2) & UPPER(MacroQueue.szField3)
+         thisSortname = UPPER(MacroQueue.szField3) & UPPER(MacroQueue.szField1) & UPPER(MacroQueue.szField2)   ! path & filename & ext, as recorded
          bPlaying -= 1
       ELSE
          thisSortname = SearchQueue.ResultQueue.SortName
@@ -2578,6 +2582,7 @@ Looped BYTE
             ThreadQueue.tabNumber = SearchQueue.tabNumber
             ThreadQueue.ThreadNo = 0
             ThreadQueue.TargetProcessHandle = kcr_GetCurrentProcess()
+            ThreadQueue.Options &= strOptions     ! keep the START parameter alive until the thread has finished
             ADD(ThreadQueue,+ThreadQueue.tabNumber)
             cs.release()
       
@@ -2592,8 +2597,9 @@ Looped BYTE
                PUT(ClockQueue)
             END
       
-            !ASSERT(0,eqDBG & 'DISPOSE FindStrOptions [' & ADDRESS(strOptions) &']')
-            DISPOSE(strOptions)
+            ! strOptions is not disposed here: with the Clarion 12 runtime the new thread may not have
+            ! copied its START parameter yet. It is disposed via ThreadQueue.Options in TakeEvent when the
+            ! search thread posts EVENT:THREAD.
             strOptions &= NULL
             ShowWaitCursor = TRUE
             SETCURSOR(CURSOR:Wait)
@@ -2983,6 +2989,10 @@ scrollDelta          LONG
           GET(ClockQueue,ClockQueue.tabNumber)
           ClockQueue.lClock = ClockQueue.lCLock - CLOCK()
           PUT(ClockQueue)
+          IF NOT ThreadQueue.Options &= NULL
+             DISPOSE(ThreadQueue.Options)            ! the search thread is done with its START parameter
+             ThreadQueue.Options &= NULL
+          END
           DELETE(ThreadQueue)
           !dbx.Debugout('ThreadQueue for tab ' & ThreadQueue.tabNumber & ' deleted in take event')
        ELSE
@@ -3730,6 +3740,8 @@ buttonPressed        LONG
              Window{PROP:Timer} = 0
              DO RefreshEditPane
           END
+       ELSIF NOT EditPaneRefreshPending
+          Window{PROP:Timer} = 0                    ! focus is elsewhere and nothing is pending: stop the 20 Hz navigation timer
        END
     OF EVENT:CreateRestorePoint
        DO CreateRestorePoint
