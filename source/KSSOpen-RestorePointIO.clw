@@ -2,6 +2,14 @@
 
    MEMBER('KSSOpen.clw')                                       ! This is a MEMBER module
 
+   MAP
+     MODULE('kernel32')
+       kss_MoveFileEx(*CSTRING lpExistingFileName, *CSTRING lpNewFileName, ULONG dwFlags),BOOL,PASCAL,RAW,NAME('MoveFileExA')
+     END
+   END
+MOVEFILE_REPLACE_EXISTING  EQUATE(1)
+MOVEFILE_WRITE_THROUGH     EQUATE(8)
+
 !region Notices
 ! ================================================================================
 ! Notice : Copyright (C) 2017, Devuna
@@ -62,6 +70,7 @@ rowUsed         LONG
 packLong        LONG
 packLen         LONG
 rowSource       &ResultQueueType
+bWriteFailed    BOOL(FALSE)                     ! any ADD failed: the .tmp is not used
 ImpExFile       FILE,DRIVER('DOS'),NAME(szImpExFileName),PRE(_DOS),CREATE,BINDABLE,THREAD
 Record              RECORD,PRE()
 ulRecordSize            ULONG
@@ -79,12 +88,19 @@ oHH           &tagHTMLHelp
             szImpExFileName = szFilename
          END
          DO ExportData
-         IF pCompact AND ReturnValue = Level:Benign
-            IF kcr_DeleteFile(szFilename)
-            END
-            RENAME(ImpExFile,szFilename)
-            IF ERRORCODE()
+         IF pCompact
+            ! Replace the previous restore point only with a completely written file, in one step
+            ! (MoveFileEx); on any failure the previous file stays and the .tmp is removed.
+            IF ReturnValue = Level:Benign AND bWriteFailed = FALSE
+               IF NOT kss_MoveFileEx(szImpExFileName, szFilename, BOR(MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH))
+                  ReturnValue = Level:Notify
+               END
+            ELSE
                ReturnValue = Level:Notify
+            END
+            IF ReturnValue <> Level:Benign
+               IF kcr_DeleteFile(szImpExFileName)
+               END
             END
          END
       !ELSE
@@ -100,11 +116,13 @@ ExportData  ROUTINE
          _DOS:ulRecordSize = SIZE(sProgramName)
          kcr_MemCpy(ADDRESS(_DOS:FileByte),ADDRESS(sProgramName),SIZE(sProgramName))
          ADD(ImpExFile,_DOS:ulRecordSize+4)
+         IF ERRORCODE() THEN bWriteFailed = TRUE.
          !Write Procedure Version
          sProcVersion = CHOOSE(pCompact <> 0, '02', '01')
          _DOS:ulRecordSize = SIZE(sProcVersion)
          kcr_MemCpy(ADDRESS(_DOS:FileByte),ADDRESS(sProcVersion),SIZE(sProcVersion))
          ADD(ImpExFile,_DOS:ulRecordSize+4)
+         IF ERRORCODE() THEN bWriteFailed = TRUE.
 
          !Save FindStrOptions ---------------------------
          IF SIZE(FindStrOptionsGroupType) > SIZE(_DOS:Record)
@@ -113,6 +131,7 @@ ExportData  ROUTINE
          _DOS:ulRecordSize = SIZE(FindStrOptionsGroupType)
          kcr_MemCpy(ADDRESS(_DOS:FileByte),ADDRESS(pFindStrOptions),SIZE(FindStrOptionsGroupType))
          ADD(ImpExFile,_DOS:ulRecordSize+4)
+         IF ERRORCODE() THEN bWriteFailed = TRUE.
 
          !Save ResultsQueue ---------------------------
          IF SIZE(ResultQueueType) > SIZE(_DOS:Record)
@@ -124,6 +143,7 @@ ExportData  ROUTINE
             rowSource &= pFindStrOptions.UndoQueue
             DO WriteCompactQueue
             CLOSE(ImpExFile)
+            IF ERRORCODE() THEN bWriteFailed = TRUE.
             EXIT
          END
          _DOS:ulRecordSize = RECORDS(pFindStrOptions.ResultQueue)
@@ -158,6 +178,7 @@ ExportData  ROUTINE
 WriteCompactQueue ROUTINE
       _DOS:ulRecordSize = RECORDS(rowSource)
       ADD(ImpExFile,4)
+      IF ERRORCODE() THEN bWriteFailed = TRUE.
       blockUsed = 0
       LOOP lQueuePointer = 1 TO RECORDS(rowSource)
          GET(rowSource,lQueuePointer)
@@ -195,6 +216,7 @@ FlushBlock ROUTINE
       IF blockUsed > 0
          _DOS:ulRecordSize = blockUsed
          ADD(ImpExFile,blockUsed+4)
+         IF ERRORCODE() THEN bWriteFailed = TRUE.
          blockUsed = 0
       END
    EXIT
@@ -238,7 +260,12 @@ rowEnd          LONG
 rowLen          LONG
 fieldLen        LONG
 bReadOk         BOOL
+bQueueComplete  BOOL                            ! ReadCompactQueue read every row it announced
 rowTarget       &ResultQueueType
+tmpResults      QUEUE(ResultQueueType)          ! a format-02 file is read here first and only copied
+                END                             ! into the tab when both queues are complete
+tmpUndo         QUEUE(ResultQueueType)
+                END
 szImpExFileName CSTRING(FILE:MaxFilePath),AUTO,STATIC,THREAD
 ImpExFile       FILE,DRIVER('DOS'),NAME(szImpExFileName),PRE(_DOS),CREATE,BINDABLE,THREAD
 Record              RECORD,PRE()
@@ -270,9 +297,12 @@ ImportData  ROUTINE
          GET(ImpExFile,ulFilePointer,4)
          ulFilePointer += 4
          ulLength = _DOS:ulRecordSize
-         GET(ImpExFile,ulFilePointer,ulLength)
-         ulFilePointer += ulLength
-         kcr_MemCpy(ADDRESS(sProgramName),ADDRESS(_DOS:Record),ulLength)
+         sProgramName = ''
+         IF ulLength <= SIZE(sProgramName)            ! lengths come from the file: never copy past the destination
+            GET(ImpExFile,ulFilePointer,ulLength)
+            ulFilePointer += ulLength
+            kcr_MemCpy(ADDRESS(sProgramName),ADDRESS(_DOS:Record),ulLength)
+         END
          IF sProgramName = 'KSS'
             GET(ImpExFile,ulFilePointer,4)
             IF _DOS:ulRecordSize = 2
@@ -295,6 +325,12 @@ ImportData  ROUTINE
             GET(ImpExFile,ulFilePointer,4)
             ulFilePointer += 4
             ulLength = _DOS:ulRecordSize
+            IF ulLength > SIZE(FindStrOptionsGroupType)
+               MESSAGE(szImpExFileName & ' Invalid File Type','Error - Load Aborted',ICON:Hand)
+               ReturnValue = Level:Notify
+               CLOSE(ImpExFile)
+               EXIT
+            END
             GET(ImpExFile,ulFilePointer,ulLength)
             IF ~ERRORCODE()
                ulFilePointer += ulLength
@@ -309,10 +345,31 @@ ImportData  ROUTINE
 
 
             IF sProcVersion = '02'                    ! compact restore point
-               rowTarget &= pFindStrOptions.ResultQueue
+               rowTarget &= tmpResults
                DO ReadCompactQueue
-               rowTarget &= pFindStrOptions.UndoQueue
-               DO ReadCompactQueue
+               IF bQueueComplete = TRUE
+                  rowTarget &= tmpUndo
+                  DO ReadCompactQueue
+               END
+               IF bQueueComplete = TRUE
+                  FREE(pFindStrOptions.ResultQueue)
+                  LOOP lQueuePointer = 1 TO RECORDS(tmpResults)
+                     GET(tmpResults,lQueuePointer)
+                     pFindStrOptions.ResultQueue = tmpResults
+                     ADD(pFindStrOptions.ResultQueue)
+                  END
+                  FREE(pFindStrOptions.UndoQueue)
+                  LOOP lQueuePointer = 1 TO RECORDS(tmpUndo)
+                     GET(tmpUndo,lQueuePointer)
+                     pFindStrOptions.UndoQueue = tmpUndo
+                     ADD(pFindStrOptions.UndoQueue)
+                  END
+               ELSE
+                  MESSAGE(szImpExFileName & ' is damaged or incomplete and was not loaded.','Error - Load Aborted',ICON:Hand)
+                  ReturnValue = Level:Notify
+               END
+               FREE(tmpResults)
+               FREE(tmpUndo)
                CLOSE(ImpExFile)
                EXIT
             END
@@ -327,6 +384,7 @@ ImportData  ROUTINE
                  IF ~ERRORCODE()
                     ulFilePointer += 4
                     ulLength = _DOS:ulRecordSize
+                    IF ulLength > SIZE(ResultQueueType) THEN BREAK.
                     GET(ImpExFile,ulFilePointer,ulLength)
                     IF ~ERRORCODE()
                        ulFilePointer += ulLength
@@ -352,6 +410,7 @@ ImportData  ROUTINE
                  IF ~ERRORCODE()
                     ulFilePointer += 4
                     ulLength = _DOS:ulRecordSize
+                    IF ulLength > SIZE(ResultQueueType) THEN BREAK.
                     GET(ImpExFile,ulFilePointer,ulLength)
                     IF ~ERRORCODE()
                        ulFilePointer += ulLength
@@ -381,6 +440,7 @@ ImportData  ROUTINE
 ! against the block and the field sizes, so a damaged file cannot write past a field.
 ReadCompactQueue ROUTINE
       FREE(rowTarget)
+      bQueueComplete = FALSE
       GET(ImpExFile,ulFilePointer,4)
       IF ERRORCODE() THEN EXIT.
       ulFilePointer += 4
@@ -421,6 +481,7 @@ ReadCompactQueue ROUTINE
          END
          IF blockPos < ulLength AND lQueuePointer < lQueueRecords THEN BREAK.   ! damaged block
       END
+      bQueueComplete = CHOOSE(lQueuePointer = lQueueRecords AND lQueueRecords >= 0)
    EXIT
 ! In: fieldLen = SIZE of the CSTRING field. Out: fieldLen = stored length, blockPos past the bytes.
 UnpackString ROUTINE

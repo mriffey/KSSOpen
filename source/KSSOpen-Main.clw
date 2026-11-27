@@ -759,6 +759,9 @@ thisProcInfo         &PROCESS_INFORMATION
          DISPOSE(SearchQueue.UndoQueue)
          SearchQueue.UndoQueue &= NULL
 
+         CappedQueue.tabNumber = SearchQueue.tabNumber
+         GET(CappedQueue,CappedQueue.tabNumber)
+         IF NOT ERRORCODE() THEN DELETE(CappedQueue).
          DESTROY(SearchQueue.feqSearchProgress)
          SearchQueue.feqSearchProgress = 0
          DESTROY(SearchQueue.tabNumber)
@@ -2661,6 +2664,9 @@ Looped BYTE
             ThreadQueue.Results &= privateResults
             ThreadQueue.bCloseTab = FALSE
             ThreadQueue.bCapped = FALSE
+            CappedQueue.tabNumber = SearchQueue.tabNumber   ! a new search: forget the previous limit note
+            GET(CappedQueue,CappedQueue.tabNumber)
+            IF NOT ERRORCODE() THEN DELETE(CappedQueue).
             ADD(ThreadQueue,+ThreadQueue.tabNumber)
             cs.release()
       
@@ -3095,12 +3101,12 @@ bFinishedTabFound    BOOL
              ThreadQueue.Options &= NULL
           END
           bCloseFinishedTab = ThreadQueue.bCloseTab
-          CappedQueue.tabNumber = finishedTab
-          GET(CappedQueue,CappedQueue.tabNumber)
-          IF ThreadQueue.bCapped = TRUE
-             IF ERRORCODE() THEN ADD(CappedQueue,+CappedQueue.tabNumber).
-          ELSIF NOT ERRORCODE()
-             DELETE(CappedQueue)
+          IF ThreadQueue.bCapped = TRUE                  ! cleared when the search started
+             CappedQueue.tabNumber = finishedTab
+             GET(CappedQueue,CappedQueue.tabNumber)
+             IF ERRORCODE()
+                ADD(CappedQueue,+CappedQueue.tabNumber)
+             END
           END
           finishedResults &= ThreadQueue.Results
           ThreadQueue.Results &= NULL

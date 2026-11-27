@@ -618,7 +618,8 @@ glo:bSearchNewTabPressed BYTE
 glo:nDefaultSearchButton BYTE(2)
 glo:nDeleteWarningCount LONG
 glo:MaxResults       LONG(1000000)                         ! a search stops adding rows at this many matches (0 = no limit; [Global] MaxResults)
-glo:bResultsCapped   BYTE,THREAD                           ! set by FillResultQueue when it stopped at glo:MaxResults
+glo:bResultsCapped   BYTE,THREAD                           ! set when the search stopped at glo:MaxResults
+glo:bCapRawRows      BYTE,THREAD                           ! FillResultQueue applies the limit (not when FindStr filters comments afterwards)
 glo:bDontShowSubdirectoryWarning BOOL
 glo:SyncPathWithPattern BOOL
 glo:PlusKey          LONG(06Bh)

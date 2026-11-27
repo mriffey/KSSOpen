@@ -419,7 +419,7 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                   ResultQueue.FileDate = currentFileDate
                   ResultQueue.FileTime = currentFileTime
 
-                  IF glo:MaxResults > 0 AND RECORDS(ResultQueue) >= glo:MaxResults
+                  IF glo:bCapRawRows = TRUE AND glo:MaxResults > 0 AND RECORDS(ResultQueue) >= glo:MaxResults
                      glo:bResultsCapped = TRUE                 ! keep memory bounded on huge result sets
                   ELSE
                      ADD(ResultQueue)                          ! sorted once after the output is read
@@ -454,7 +454,7 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                ResultQueue.FileDate = currentFileDate
                ResultQueue.FileTime = currentFileTime
 
-               IF glo:MaxResults > 0 AND RECORDS(ResultQueue) >= glo:MaxResults
+               IF glo:bCapRawRows = TRUE AND glo:MaxResults > 0 AND RECORDS(ResultQueue) >= glo:MaxResults
                   glo:bResultsCapped = TRUE
                ELSE
                   ADD(ResultQueue)                             ! sorted once after the output is read

@@ -402,6 +402,9 @@ szBackslashes        CSTRING(512)
                   IF szSearchStringFilename <> ''
                      REMOVE(szSearchStringFilename)
                   END
+                  ! With comments excluded the limit applies to the rows the filter keeps (below), so
+                  ! comment-only matches cannot use it up.
+                  glo:bCapRawRows = CHOOSE(FindStrOptions.bExcludeComments = FALSE)
                   FillResultQueue(ResultQueue, FindStrOptions.feqSearchProgress, szFixedFileMask, szFixedExcludeMask, CancelFlag, progressCalls, FindStrOptions.bFilenamesOnly, FindStrOptions.bFileListFromFile)
 
                   IF FindStrOptions.bExcludeComments
@@ -421,6 +424,13 @@ szBackslashes        CSTRING(512)
                            DELETE(ResultQueue)
                         END
                         IF i % 256 = 0 THEN YIELD().
+                     END
+                     IF glo:MaxResults > 0 AND RECORDS(ResultQueue) > glo:MaxResults
+                        LOOP i = RECORDS(ResultQueue) TO glo:MaxResults + 1 BY -1
+                           GET(ResultQueue,i)
+                           DELETE(ResultQueue)
+                        END
+                        glo:bResultsCapped = TRUE
                      END
                   END
                   SETPATH(SavePath)
