@@ -406,7 +406,7 @@ szBackslashes        CSTRING(512)
       saAttr.lpSecurityDescriptor = 0
 
       ! Create a pipe for the child process's STDOUT.
-      IF kcr_CreatePipe(g_hChildStd_OUT_Rd, g_hChildStd_OUT_Wr, saAttr, 0)
+      IF kcr_CreatePipe(g_hChildStd_OUT_Rd, g_hChildStd_OUT_Wr, saAttr, 1048576)   ! 1 MB buffer so findstr rarely blocks
          !Ensure the read handle to the pipe for STDOUT is not inherited.
          IF kcr_SetHandleInformation(g_hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0)
          !IF kcr_SetHandleInformation(g_hChildStd_OUT_Rd, BOR(HANDLE_FLAG_INHERIT,FILE_FLAG_OVERLAPPED), 0)
