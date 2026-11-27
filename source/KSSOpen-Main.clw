@@ -211,6 +211,9 @@ tabNumber                 LONG
 bClosePending           BOOL(FALSE)                        ! close requested while searches were running
 bForceClose             BOOL(FALSE)                        ! close now, even if searches are still running
 closePendingClock       LONG
+LexerCacheLexer         LONG(-1)                           ! lexer and property file last loaded by SetLexerType
+LexerCacheFile          CSTRING(256)
+bLexerCacheValid        BOOL(FALSE)                        ! cleared by SetDefaultStyles and every other properties load
 CLOSE_FORCE_DELAY       EQUATE(500)                        ! 1/100 s before a repeated close request closes despite running searches
 FocusPosition           LONG
 FoldMarginClicked       BOOL
@@ -2877,6 +2880,7 @@ Looped BYTE
       IF PropertiesChanged
          SciControl.ResetPopupMenu()
          LoadLexerProperties(SciControl,SearchQueue.szPropertyFile)
+         bLexerCacheValid = FALSE                  ! options or property files changed
          SciControl.Colourise(0,-1)
          SciControl.MarkerSetBack(markerBookmark, glo:BookmarkBack)
          SciControl.SetSelBack(TRUE,glo:SelectedBack)
@@ -4039,8 +4043,16 @@ bInOmit              BOOL(FALSE)
 bInLoop              BOOL(FALSE)
 bInRegion            BOOL(FALSE)
 szOmitToken          CSTRING(265)
+lineText             CSTRING(2049)                         ! the line without trailing spaces (one pass over the 2048-byte buffer)
+lineUpper            CSTRING(2049)
+saveModMask          LONG
 
    CODE
+      ! No SCN_MODIFIED notifications while the fold levels are set. Scintilla 3.0.1 sends one per
+      ! SetFoldLevel (as SC_MOD_CHANGEFOLD + SC_MOD_CHANGEMARKER), each handled by the window's event
+      ! loop: that was about two thirds of the time to open a file in the viewer. Text is not changed here.
+      saveModMask = SciControl.GetModEventMask()
+      SciControl.SetModEventMask(0)
       thisFoldLevel = 1024
       thisFile = SearchQueue.ResultQueue.SortName
       thisLine = 0
@@ -4054,9 +4066,11 @@ szOmitToken          CSTRING(265)
                BREAK
             ELSE
                thisLine += 1
+               lineText = CLIP(AsciiFile.Buffer)        ! the string functions below work on this short copy
+               lineUpper = UPPER(lineText)
                IF bInOmit = TRUE
                   SciControl.SetFoldLevel(thisLine-1,thisFoldLevel)
-                  thisText = UPPER(AsciiFile.Buffer)
+                  thisText = lineUpper
                   IF INSTRING(szOmitToken,thisText,1)
                      bInOmit = FALSE
                      szOmitToken = ''
@@ -4065,7 +4079,7 @@ szOmitToken          CSTRING(265)
                   CYCLE
                END
 
-               thisText = UPPER(CLIP(LEFT(AsciiFile.Buffer)))
+               thisText = CLIP(LEFT(lineUpper))
                IF thisText[1] = '!'
                   IF INSTRING('!REGION',thisText,1)
                      SciControl.SetFoldLevel(thisLine-1,BOR(thisFoldLevel,SC_FOLDLEVELHEADERFLAG))
@@ -4083,16 +4097,16 @@ szOmitToken          CSTRING(265)
                END
 
                !remove comment
-               IF AsciiFile.Buffer[1] = ' '
+               IF lineText = '' OR lineText[1] = ' '
                   thisText = ' '
                ELSE
                   thisText = ''
                END
-               i = INSTRING('!',AsciiFile.Buffer)
+               i = INSTRING('!',lineText)
                IF i
-                  thisText = thisText & UPPER(CLIP(LEFT(AsciiFile.Buffer[1 : i-1])))
+                  thisText = thisText & CLIP(LEFT(lineUpper[1 : i-1]))
                ELSE
-                  thisText = thisText & UPPER(CLIP(LEFT(AsciiFile.Buffer)))
+                  thisText = thisText & CLIP(LEFT(lineUpper))
                END
 
 
@@ -4179,7 +4193,7 @@ szOmitToken          CSTRING(265)
                   thisFoldLevel += 1
                ELSIF thisText[1 : 3] = ' IF'
                   SciControl.SetFoldLevel(thisLine-1,BOR(thisFoldLevel,SC_FOLDLEVELHEADERFLAG))
-                  IF thisText[LEN(thisText)] = '.' OR thisText[LEN(thisText)-3 : LEN(thisText)] = ';END'
+                  IF thisText[LEN(thisText)] = '.' OR (LEN(thisText) >= 4 AND thisText[LEN(thisText)-3 : LEN(thisText)] = ';END')   ! a bare ' IF' would slice from 0
                      !don't bump level
                   ELSE
                      thisFoldLevel += 1
@@ -4337,6 +4351,7 @@ szOmitToken          CSTRING(265)
       ELSE
          !error opening file
       END
+      SciControl.SetModEventMask(saveModMask)
       RETURN
 ConfirmAutoSave PROCEDURE() !,LONG
 ReturnValue                   LONG(0)
@@ -4439,12 +4454,16 @@ szProperty      CSTRING('fold')
 szPropertyValue CSTRING(2)
   CODE
   cc = SELF.GetProperty(szProperty,szPropertyValue)
-  SELF.bFoldMargin = 1 - szPropertyValue
-  sciControl.foldMargin()
+  ! FoldMargin toggles the margin to match the 'fold' property (and resets fold.compact). Skip it on a
+  ! cached-lexer open when they already match: turning the margin off walks every line (EnsureVisible).
+  IF bLexerCacheValid = FALSE OR SELF.bFoldMargin <> CHOOSE(szPropertyValue = '1')
+     SELF.bFoldMargin = 1 - szPropertyValue
+     sciControl.foldMargin()
+  END
   PARENT.Colourise(lStart,lEnd)
   !CASE UPPER(SearchQueue.ResultQueue.szExtension)
   !  OF '.CLA' OROF '.CLW' OROF '.TPL' OROF '.TPW'
-  IF SELF.GetLexer() = SCLEX_CLWNOCASE
+  IF SELF.GetLexer() = SCLEX_CLWNOCASE AND SELF.bFoldMargin = TRUE   ! fold levels are only used with the fold margin
      FixFileFolding()
   END
   Window{PROP:Color} = SELF.StyleGetBack(32)
@@ -4657,7 +4676,6 @@ szLexer        CSTRING(33)
      END
   
      IF MATCH(UPPER(szFileType),UPPER(String2),Match:Regular)
-        SELF.SetDefaultStyles()
         CASE FileExtensionQueue.nLexer
           OF SCLEX_MSSQL OROF SCLEX_MYSQL OROF SCLEX_SQL
              IF FileExtensionQueue.Extension = '*.SQL'
@@ -4670,7 +4688,16 @@ szLexer        CSTRING(33)
                 END
              END
         END
-        SELF.SetLexer(FileExtensionQueue.nLexer,FileExtensionQueue.FileMode)
+        IF bLexerCacheValid = TRUE AND LexerCacheLexer = FileExtensionQueue.nLexer AND LexerCacheFile = FileExtensionQueue.FileMode AND SELF.GetLexer() = FileExtensionQueue.nLexer
+           SearchQueue.szPropertyFile = FileExtensionQueue.FileMode   ! same lexer and styles as the previous file: no reload, only restyle
+           SELF.Colourise(0,-1)
+        ELSE
+           SELF.SetDefaultStyles()
+           SELF.SetLexer(FileExtensionQueue.nLexer,FileExtensionQueue.FileMode)
+           LexerCacheLexer = FileExtensionQueue.nLexer
+           LexerCacheFile = FileExtensionQueue.FileMode
+           bLexerCacheValid = CHOOSE(SELF.GetLexer() = FileExtensionQueue.nLexer)   ! not when the load failed and fell back to text
+        END
         BREAK
      ELSE
         !cycle
@@ -4678,7 +4705,6 @@ szLexer        CSTRING(33)
   END
   
   IF i > RECORDS(FileExtensionQueue)
-     SELF.SetDefaultStyles()
      defaultLexer = GetPropertyFileLexer(glo:szDefaultPropertyFile)
      CASE defaultLexer
        OF 'clarion'
@@ -4694,7 +4720,16 @@ szLexer        CSTRING(33)
             nLexer = SCLEX_NULL
          END
      END
-     SELF.SetLexer(defaultLexer,glo:szDefaultPropertyFile)
+     IF bLexerCacheValid = TRUE AND LexerCacheLexer = nLexer AND LexerCacheFile = glo:szDefaultPropertyFile AND SELF.GetLexer() = nLexer
+        SearchQueue.szPropertyFile = glo:szDefaultPropertyFile
+        SELF.Colourise(0,-1)
+     ELSE
+        SELF.SetDefaultStyles()
+        SELF.SetLexer(nLexer,glo:szDefaultPropertyFile)   ! was SetLexer(defaultLexer,...): the lexer name, which is not a lexer number
+        LexerCacheLexer = nLexer
+        LexerCacheFile = glo:szDefaultPropertyFile
+        bLexerCacheValid = CHOOSE(SELF.GetLexer() = nLexer)
+     END
      FileExtensionQueue.FileMode = glo:szDefaultPropertyFile
   END
   
@@ -4718,7 +4753,7 @@ szProperty  CSTRING('fold')
 szValue     CSTRING('0')
   CODE
   PARENT.SetTextLexer
-  SELF.SetDefaultStyles()
+  SELF.SetDefaultStyles()                          ! also clears the lexer cache
   SearchQueue.szPropertyFile = 'text'
   IF LoadLexerProperties(SELF,'text')
      SELF.SetProperty(szProperty, szValue)
@@ -4814,6 +4849,9 @@ szLexer              CSTRING(33)
               SELF.FoldAll()
            OF 'FoldMargin'
               SELF.FoldMargin()
+              IF SELF.bFoldMargin = TRUE AND SELF.GetLexer() = SCLEX_CLWNOCASE
+                 FixFileFolding()                  ! not computed while the margin was off
+              END
            OF 'Find'
               SELF.SetFindGroup(SearchQueue.FindGroup)
               SELF.SearchAsk(TRUE,oHH)
@@ -4834,6 +4872,7 @@ szLexer              CSTRING(33)
               glo:bHotSpotsEnabled = 1 - glo:bHotSpotsEnabled
               SELF.Popup.SetIcon('HotSpotsEnabled',CHOOSE(glo:bHotSpotsEnabled,'Checkbox_on.ico','Checkbox_off.ico'))
               LoadLexerProperties(SELF,SearchQueue.szPropertyFile)
+              bLexerCacheValid = FALSE
            OF 'AutoSave'
               glo:bAutoSave = 1 - glo:bAutoSave
               SELF.Popup.SetIcon('AutoSave',CHOOSE(glo:bAutoSave,'Checkbox_on.ico','Checkbox_off.ico'))
@@ -5690,6 +5729,7 @@ szProperty           CSTRING(256)
 szPropertyValue      CSTRING(256)
 
   CODE
+      bLexerCacheValid = FALSE                     ! SetLexerType sets it again after its own load
       IF SELF.GetLexer() <> Lexer
          SELF.SetLexer(Lexer)
          SearchQueue.szPropertyFile = PropertyFile
@@ -5709,6 +5749,7 @@ szPropertyValue      CSTRING(256)
 SciControl.SetDefaultStyles PROCEDURE()
 
   CODE
+      bLexerCacheValid = FALSE                     ! styles reset: the next file reloads its properties
   !# Global default styles for all languages
   !# Default
   !style.*.32=$(font.base)
