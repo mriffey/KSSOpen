@@ -86,7 +86,11 @@ modulo         LONG
 CommentStyle   LONG
 excludeQueue   QUEUE,PRE(exq)
 excludemask       CSTRING(256)
+bFullPath         BOOL           !mask contains '\': match the full path, else the file name only
                END
+excludeName    CSTRING(1025)     !folder & file name of the current findstr line
+lastExcludeName CSTRING(1025)    !file name tested last; findstr lists a file's lines together
+bExcluded      BOOL(FALSE)       !result for lastExcludeName
 
 
   CODE
@@ -96,20 +100,25 @@ excludemask       CSTRING(256)
 
    IF szFixedExcludeMask <> ''
       i = 1
-      j = INSTRING(' ',szFixedExcludeMask)
-      LOOP WHILE j
-         excludeQueue.excludemask = szFixedExcludeMask[i : j-1]
-         ADD(excludeQueue)
-         i = j+1
-         j = INSTRING(' ',szFixedExcludeMask,1,i)
+      j = LEN(szFixedExcludeMask)
+      LOOP WHILE i <= j
+         p = INSTRING(' ',szFixedExcludeMask,1,i)
+         IF p = 0
+            p = j + 1
+         END
+         IF p > i
+            excludeQueue.excludemask = szFixedExcludeMask[i : p-1]
+            excludeQueue.bFullPath = CHOOSE(INSTRING('\',excludeQueue.excludemask,1,1) > 0, TRUE, FALSE)
+            ADD(excludeQueue)
+         END
+         i = p + 1
       END
-      excludeQueue.excludemask = szFixedExcludeMask[i : LEN(szFixedExcludeMask)]
-      ADD(excludeQueue)
    END
 
    FREE(ResultQueue)
    j = RECORDS(STDOUT_Queue)
    LOOP i = 1 TO j
+      IF bCancelFlag = TRUE THEN BREAK.                  ! cancelled: keep the rows parsed so far
       GET(STDOUT_Queue,i)
       sizeNeeded = LEN(thisBuffer) + LEN(STDOUT_Queue.Buffer) + 1
       IF sizeNeeded > SIZE(thisBuffer)
@@ -141,6 +150,8 @@ excludemask       CSTRING(256)
    !ASSERT(0,eqDBG & 'DISPOSE thisBuffer [' & ADDRESS(thisBuffer) & ']')
    DISPOSE(thisBuffer)
    thisBuffer &= NULL
+
+   SORT(ResultQueue,+ResultQueue.SortName,+ResultQueue.LineNo)   ! one sort instead of a keyed ADD per line; the pass below needs file order
 
    thisFile = ''
    j = RECORDS(ResultQueue)
@@ -176,8 +187,6 @@ excludemask       CSTRING(256)
       END
    END
 
-   SORT(ResultQueue,+ResultQueue.SortName,+ResultQueue.LineNo)
-
    IF NOT thisBuffer &= NULL
       !ASSERT(0,eqDBG & 'DISPOSE thisBuffer [' & ADDRESS(thisBuffer) & ']')
       DISPOSE(thisBuffer)
@@ -211,7 +220,19 @@ currentPath    LIKE(ResultQueue.Path)
          END
          !ASSERT(0,eqDBG & 'Thread ' & thread() & ' look for delimiter ' & thisString)
          IF bFileListFromFile = TRUE
-            DO ProcessThisString
+            IF RECORDS(excludeQueue)
+               !absolute path here: the file name ends at the first ':' after the drive colon
+               p = INSTRING(':',thisString,1,3)
+               IF p > 1
+                  excludeName = thisString[1 : p-1]
+               ELSE
+                  excludeName = thisString
+               END
+               DO CheckExcluded
+            END
+            IF NOT bExcluded
+               DO ProcessThisString
+            END
          ELSE
             IF thisString[1 : 2] = '  '
                thisFolder = CLIP(LEFT(thisString))
@@ -246,15 +267,23 @@ currentPath    LIKE(ResultQueue.Path)
 !                  thisString = thisFolder & thisString
 !               END
                !!!EndRegion
-               thisString = thisFolder & thisString
-
-               LOOP n = 1 TO RECORDS(excludeQueue)
-                  GET(excludeQueue,n)
-                  IF MATCH(UPPER(thisString),excludeQueue.excludemask,Match:Regular)
-                     BREAK
+               IF RECORDS(excludeQueue)
+                  !the file name is the text before the first ':' (file:line:text, or just file with /m)
+                  p = INSTRING(':',thisString,1,1)
+                  IF p > 1
+                     excludeName = thisString[1 : p-1]
+                  ELSE
+                     excludeName = thisString
                   END
+                  IF NUMERIC(excludeName) AND NOT INSTRING('/s',glo:ThreadCmdLine,1)
+                     excludeName = szFixedFileMask          !one file searched: findstr leaves out its name (as in ProcessThisString)
+                  END
+                  excludeName = thisFolder & excludeName
+                  DO CheckExcluded
                END
-               IF n > RECORDS(excludeQueue)
+
+               thisString = thisFolder & thisString
+               IF NOT bExcluded
                   DO ProcessThisString
                END
 
@@ -269,6 +298,39 @@ currentPath    LIKE(ResultQueue.Path)
             thisBuffer = thisBuffer[i : LEN(thisBuffer)]
          ELSE
             thisBuffer = ''
+         END
+      END
+
+CheckExcluded        ROUTINE
+      IF excludeName <> lastExcludeName
+         lastExcludeName = excludeName
+         DO TestExcludeMasks
+      END
+
+TestExcludeMasks     ROUTINE
+   DATA
+n2             LONG
+p2             LONG
+excludeFile    CSTRING(1025)
+
+   CODE
+      excludeFile = excludeName
+      LOOP p2 = LEN(excludeName) TO 1 BY -1
+         IF excludeName[p2] = '\'
+            excludeFile = excludeName[p2+1 : LEN(excludeName)]
+            BREAK
+         END
+      END
+      bExcluded = FALSE
+      LOOP n2 = 1 TO RECORDS(excludeQueue)
+         GET(excludeQueue,n2)
+         IF excludeQueue.bFullPath
+            bExcluded = MATCH(excludeName,excludeQueue.excludemask,Match:Wild+Match:NoCase)
+         ELSE
+            bExcluded = MATCH(excludeFile,excludeQueue.excludemask,Match:Wild+Match:NoCase)
+         END
+         IF bExcluded
+            BREAK
          END
       END
 
@@ -308,7 +370,7 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                ResultQueue.Filename = szName
                ResultQueue.szExtension = szExtension
 
-               IF NOT INSTRING('/s',glo:findstrCommandLine,1)
+               IF NOT INSTRING('/s',glo:ThreadCmdLine,1)
                   IF NUMERIC(szName) AND szExtension = ''
                      pDot = INSTRING('.',szFixedFileMask)
                      szName = szFixedFileMask[1 : pDot-1]
@@ -347,7 +409,7 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                   ResultQueue.FileDate = currentFileDate
                   ResultQueue.FileTime = currentFileTime
 
-                  ADD(ResultQueue,+ResultQueue.SortName,+ResultQueue.LineNo)
+                  ADD(ResultQueue)                             ! sorted once after the output is read
                END
             ELSIF bFilenamesOnly
                szPath = thisString
@@ -378,7 +440,7 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                ResultQueue.FileDate = currentFileDate
                ResultQueue.FileTime = currentFileTime
 
-               ADD(ResultQueue,+ResultQueue.SortName,+ResultQueue.LineNo)
+               ADD(ResultQueue)                                ! sorted once after the output is read
             END
 
 ProcessFile    ROUTINE

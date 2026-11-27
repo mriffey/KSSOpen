@@ -53,6 +53,7 @@ w              WINDOW,TIMER(100)
 thrd           LONG
 ReadFileParams LIKE(ReadFileParamsType)
 progressCalls  LONG
+bStopping      BOOL(FALSE)
 
   CODE
     
@@ -68,29 +69,39 @@ progressCalls  LONG
       IF CloseHandle(g_hChildStd_OUT_Wr)
          OPEN(w)
          w{PROP:HIDE} = TRUE
+         ! ReadFile uses ReadFileParams (a local here) and adds to STDOUT_Queue until it posts
+         ! EVENT:User, so this loop only ends after that, or before ReadFile was started.
+         ! There is no timeout: once findstr is terminated ReadFile's read fails and it finishes.
          ACCEPT
-            IF bCancelFlag = TRUE
-               POST(EVENT:CloseDown,,thrd,0)
-               BREAK
-            ELSE
-               CASE EVENT()
-                 OF EVENT:CloseDown
-                    BREAK
-                 OF EVENT:CloseWindow
-                    BREAK
-                 OF EVENT:OpenWindow
+            IF bCancelFlag = TRUE AND bStopping = FALSE
+               DO StopReading
+               IF thrd = 0 THEN BREAK.
+            END
+            CASE EVENT()
+              OF EVENT:CloseDown
+              OROF EVENT:CloseWindow
+                 IF thrd = 0 THEN BREAK.
+                 IF bStopping = FALSE THEN DO StopReading.
+                 CYCLE
+              OF EVENT:OpenWindow
+                 IF bStopping = FALSE
                     ReadFileParams.ParentThread = THREAD()
                     ReadFileParams.ParentPipe   = g_hChildStd_OUT_Rd
                     ReadFileParams.ParentQueue  &= STDOUT_Queue
                     thrd = START(ReadFile,25000,ReadFileParams)
+                    IF thrd = 0 THEN BREAK.
                     RESUME(thrd)
-                 OF EVENT:User
-                    POST(EVENT:CloseWindow)
-                 OF EVENT:Timer
+                 END
+              OF EVENT:User
+                 BREAK                                         ! ReadFile has finished
+              OF EVENT:Timer
+                 IF bStopping = TRUE
+                    kcr_TerminateProcess(piProcInfo.hProcess,0)   ! still waiting for ReadFile: make sure findstr is gone
+                 ELSE
                     progressCalls += 1
                     POST(EVENT:PROGRESS+feqSearchProgress,,1,1)
                     YIELD()
-               END
+                 END
             END
          END
          CLOSE(w)
@@ -98,6 +109,15 @@ progressCalls  LONG
          MESSAGE('StdOutWr CloseHandle')
       END
       RETURN progressCalls
+
+! Cancel: stop findstr so ReadFile's blocking read returns, and ask ReadFile to stop.
+StopReading    ROUTINE
+      bStopping = TRUE
+      kcr_TerminateProcess(piProcInfo.hProcess,0)
+      IF thrd
+         POST(EVENT:CloseDown,,thrd,0)
+      END
+   EXIT
 !!! <summary>
 !!! Generated from procedure template - Source
 !!! Run this on it's own thread cause it block until input is available
@@ -141,21 +161,24 @@ w             WINDOW,AT(0,0,10,10),TIMER(1)
           OF EVENT:CloseDown
              BREAK
           OF EVENT:CloseWindow
-             POST(EVENT:User,,param.ParentThread,0)
              BREAK
           OF EVENT:Timer
-             CLEAR(chBuf,-1)
-             bSuccess = kcr_ReadFile( param.ParentPipe, ADDRESS(chBuf), BUFSIZE, ADDRESS(dwRead), 0)
-             IF bSuccess = FALSE OR dwRead = 0
-                w{PROP:timer} = 0
+             ! Read until findstr closes its end of the pipe (ReadFile then fails or returns 0 bytes).
+             ! Reading in a loop rather than once per timer tick keeps the pipe drained, so findstr is
+             ! never left waiting on a full pipe between ticks. Cancel terminates findstr, which ends the loop.
+             w{PROP:timer} = 0
+             LOOP
+                CLEAR(chBuf,-1)
+                bSuccess = kcr_ReadFile( param.ParentPipe, ADDRESS(chBuf), BUFSIZE, ADDRESS(dwRead), 0)
                 param.ParentQueue.Buffer = chBuf
                 ADD(param.ParentQueue)
-                POST(EVENT:CloseWindow)
-             ELSE
-                param.ParentQueue.Buffer = chBuf
-                ADD(param.ParentQueue)
+                IF bSuccess = FALSE OR dwRead = 0
+                   BREAK
+                END
              END
+             POST(EVENT:CloseWindow)
         END
      END
      CLOSE(w)
+     POST(EVENT:User,,param.ParentThread,0)       ! on every exit path: ReadFromPipe waits for this
      RETURN

@@ -205,6 +205,13 @@ CurrentFilename         CSTRING(MAX_PATH)
 szTitle                 CSTRING(256)
 bAutoSearch             BOOL
 bDoAutoSize             BOOL(FALSE)
+AutoSizeQueue           QUEUE                              ! tabs whose search finished while another tab was shown
+tabNumber                 LONG
+                        END
+bClosePending           BOOL(FALSE)                        ! close requested while searches were running
+bForceClose             BOOL(FALSE)                        ! close now, even if searches are still running
+closePendingClock       LONG
+CLOSE_FORCE_DELAY       EQUATE(500)                        ! 1/100 s before a repeated close request closes despite running searches
 FocusPosition           LONG
 FoldMarginClicked       BOOL
 bShowEvalMessage        BOOL(FALSE)
@@ -576,6 +583,7 @@ SaveSearchParameters ROUTINE
    DATA
 n                 LONG
 LocationColWidth  LONG
+szIniPattern      LIKE(SearchQueue.szPattern)
 
    CODE
       INIMgr.Update('Search Options','bMatchPatternStartOfLine',SearchQueue.bMatchPatternStartOfLine)
@@ -589,9 +597,12 @@ LocationColWidth  LONG
       INIMgr.Update('Search Options','bExcludeComments',SearchQueue.bExcludeComments)
       !INIMgr.Update('Search Options','bIncludeBinary',SearchQueue.bIncludeBinary)
 
-      ReplaceChr(SearchQueue.szPattern,'''','§')
+      ! Swap ' for § only in the copy written to the INI. Changing SearchQueue.szPattern itself left the
+      ! tab's pattern with §, so the Cmt button (DeleteCommentLines) never matched patterns with an apostrophe.
+      szIniPattern = SearchQueue.szPattern
+      ReplaceChr(szIniPattern,'''','§')
       !ReplaceChr(SearchQueue.szPattern,'''','<A7h>')  ! MR 20190217 avoid losing this important hex char to random translation. 
-      INIMgr.Update('Search Options','szPattern',SearchQueue.szPattern)
+      INIMgr.Update('Search Options','szPattern',szIniPattern)
 
       INIMgr.Update('Search Options','szSearchPath',SearchQueue.szSearchPath)
       INIMgr.Update('Search Options','szFileMask',SearchQueue.szFileMask)
@@ -662,7 +673,38 @@ LocationColWidth  LONG
 
       INIMgr.UpdateQueue('Macro Queue','Macro',MacroQueue,MacroQueue.feqButton,MacroQueue.szField1,MacroQueue.szField2,MacroQueue.szField3)
    EXIT
+!-----------------------------------------------------------------------------
+! Cancels the search in the current ThreadQueue record: stops findstr and sets the
+! thread's cancel flag. The caller holds cs. The thread still runs to its end and
+! posts EVENT:THREAD; its queues are released there.
+CancelThreadSearch ROUTINE
+   DATA
+cancelProcInfo   &PROCESS_INFORMATION
+cancelFlagRef    &BYTE
+   CODE
+      cancelProcInfo &= (INSTANCE(piProcInfo,ThreadQueue.ID))
+      IF NOT cancelProcInfo &= NULL
+         kcr_TerminateProcess(cancelProcInfo.hProcess,0)
+      END
+      cancelFlagRef &= (INSTANCE(CancelFlag,ThreadQueue.ID))
+      IF NOT cancelFlagRef &= NULL
+         cancelFlagRef = TRUE
+      END
+   EXIT
 HandleCloseTab ROUTINE
+      ! A search still running on this tab: cancel it and close the tab in TakeEvent when
+      ! the thread posts EVENT:THREAD, instead of freeing queues the thread still uses.
+      cs.wait()
+      ThreadQueue.tabNumber = ?CurrentSearch{PROP:ChoiceFEQ}
+      GET(ThreadQueue,+ThreadQueue.tabNumber)
+      IF NOT ERRORCODE()
+         ThreadQueue.bCloseTab = TRUE
+         PUT(ThreadQueue)
+         DO CancelThreadSearch
+         cs.release()
+         EXIT
+      END
+      cs.release()
       IF ?CurrentSearch{PROP:ChoiceFEQ} <> ?Search1
          DO CloseTab
       ELSE
@@ -695,22 +737,7 @@ thisProcInfo         &PROCESS_INFORMATION
       GET(SearchQueue,SearchQueue.tabNumber)
       IF ~ERRORCODE()
          p = POINTER(SearchQueue)
-
-         cs.wait()
-         j = RECORDS(ThreadQueue)
-         LOOP i = 1 TO j
-            GET(ThreadQueue,i)
-            IF ThreadQueue.tabNumber = SearchQueue.tabNumber
-               thisProcInfo &= (INSTANCE(piProcInfo,ThreadQueue.ID))
-               IF NOT thisProcInfo &= NULL
-                  kcr_TerminateProcess(thisProcInfo.hProcess,0)
-               END
-               POST(EVENT:CloseWindow,,ThreadQueue.ID)
-               !YIELD()
-            END
-         END
-         cs.release()
-         YIELD()
+         ! no search thread runs for this tab here: HandleCloseTab defers the close until it has finished
 
          ?ResultList{PROP:From} = ''
 
@@ -1313,7 +1340,7 @@ j                    LONG
       DO PreDelete
 
       IF bPlaying > 0
-         thisSortname = UPPER(MacroQueue.szField3) & UPPER(MacroQueue.szField2) & UPPER(MacroQueue.szField3)
+         thisSortname = UPPER(MacroQueue.szField3) & UPPER(MacroQueue.szField1) & UPPER(MacroQueue.szField2)   ! path & filename & ext, as recorded
          bPlaying -= 1
       ELSE
          thisSortname = SearchQueue.ResultQueue.SortName
@@ -1918,6 +1945,7 @@ p           LONG
 szFilename  CSTRING(261)
 Options     &FindStrOptionsGroupType
 dwId        DWORD
+bSearching  BOOL
 rrlQueue    QUEUE(ff_:queue),PRE(RRL)
             END
 
@@ -1940,6 +1968,12 @@ rrlQueue    QUEUE(ff_:queue),PRE(RRL)
       options &= ADDRESS(SearchQueue)
       LOOP i = 1 to RECORDS(SearchQueue)
          GET(SearchQueue,i)
+         cs.wait()                                     ! a tab that is still searching has no results yet
+         ThreadQueue.tabNumber = SearchQueue.tabNumber
+         GET(ThreadQueue,+ThreadQueue.tabNumber)
+         bSearching = CHOOSE(ERRORCODE() = 0)
+         cs.release()
+         IF bSearching THEN CYCLE.
          szFilename = svSpecialFolder.GetDir(SV:CSIDL_APPDATA) & '\Devuna\KSS\RestorePoint\' & dwId & '\KSS_Results_Tab' & FORMAT(SearchQueue.tabNumber,@N03) & '.rrl'
          CreateRestorePoint(Options, szFilename)
       END
@@ -2445,6 +2479,7 @@ bMatchMode           LONG
 pMatch               LONG
 szMatchText          LIKE(SearchQueue.ResultQueue.Text)
 strOptions           &STRING
+privateResults       &ResultQueueType
 findStrOptions       GROUP(FindStrOptionsGroupType),PRE(fso)
                      END
 thisProcInfo         &PROCESS_INFORMATION
@@ -2483,6 +2518,17 @@ Looped BYTE
     OF ?cmdSearch
       ThisWindow.Update()
        UPDATE()
+       ! F5 and posted EVENT:Accepted get here even while ?cmdSearch is disabled
+       cs.wait()
+       ThreadQueue.tabNumber = ?CurrentSearch{PROP:ChoiceFEQ}
+       GET(ThreadQueue,+ThreadQueue.tabNumber)
+       IF NOT ERRORCODE()
+          cs.release()
+          redoSearch = FALSE                       ! F5/Redo set it before posting; it is not consumed here
+          BEEP
+          RETURN ReturnValue
+       END
+       cs.release()
       
        IF SciControl.GetModify() AND szTitle <> ''
           DO Handle_FileModified
@@ -2569,15 +2615,22 @@ Looped BYTE
                ViewerActive = FALSE
             END
       
+            ! The thread fills a private queue that TakeEvent swaps into the tab on EVENT:THREAD,
+            ! so the list box and the main thread never use a queue that is being written.
+            privateResults &= NEW(ResultQueueType)
+            findStrOptions = SearchQueue
+            findStrOptions.ResultQueue &= privateResults
             strOptions &= NEW STRING(SIZE(FindStrOptionsGroupType))
-            !ASSERT(0,eqDBG & 'NEW FindStrOptions [' & ADDRESS(strOptions) & ']')
-            strOptions = SearchQueue
+            strOptions = findStrOptions
       
             cs.wait()
             ThreadQueue.ID = START(FindStr,25000,strOptions)
             ThreadQueue.tabNumber = SearchQueue.tabNumber
             ThreadQueue.ThreadNo = 0
             ThreadQueue.TargetProcessHandle = kcr_GetCurrentProcess()
+            ThreadQueue.Options &= strOptions     ! keep the START parameter alive until the thread has finished
+            ThreadQueue.Results &= privateResults
+            ThreadQueue.bCloseTab = FALSE
             ADD(ThreadQueue,+ThreadQueue.tabNumber)
             cs.release()
       
@@ -2592,9 +2645,11 @@ Looped BYTE
                PUT(ClockQueue)
             END
       
-            !ASSERT(0,eqDBG & 'DISPOSE FindStrOptions [' & ADDRESS(strOptions) &']')
-            DISPOSE(strOptions)
+            ! strOptions is not disposed here: with the Clarion 12 runtime the new thread may not have
+            ! copied its START parameter yet. It is disposed via ThreadQueue.Options in TakeEvent when the
+            ! search thread posts EVENT:THREAD.
             strOptions &= NULL
+            privateResults &= NULL
             ShowWaitCursor = TRUE
             SETCURSOR(CURSOR:Wait)
             DISABLE(?cmdSearch)
@@ -2899,22 +2954,7 @@ Looped BYTE
       ThreadQueue.tabNumber = SearchQueue.tabNumber
       GET(ThreadQueue,ThreadQueue.tabNumber)
       IF NOT ERRORCODE()
-         thisProcInfo &= (INSTANCE(piProcInfo,ThreadQueue.ID))
-         IF NOT thisProcInfo &= NULL
-            cc = kcr_TerminateProcess(thisProcInfo.hProcess,0)
-            !ASSERT(0,eqDBG & 'TerminateProcess called for thread ' & ThreadQueue.ID & ' cc=' & cc)
-            IF cc = 0
-               cc = kcr_FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, 0, kcr_GetLastError(), 0, errMsg, SIZE(errMsg), 0)
-               !ASSERT(0,eqDBG & 'TerminateProcess failed for thread ' & ThreadQueue.ID & ' ' & errMsg)
-            END
-            !YIELD()
-         ELSE
-            !ASSERT(0,eqDBG & 'thisProcInfo is NULL')
-         END
-         ThisCancelFlag &= INSTANCE(CancelFlag,ThreadQueue.ID)
-         ThisCancelFlag = TRUE
-      ELSE
-         !ASSERT(0,eqDBG & ERROR())
+         DO CancelThreadSearch
       END
       cs.Release()
       YIELD()
@@ -2934,8 +2974,33 @@ Looped BYTE
 ThisWindow.TakeCloseEvent PROCEDURE
 
 ReturnValue          BYTE,AUTO
+i                    LONG
+remaining            LONG
 
   CODE
+  ! Searches still running: cancel them and close when the last one has posted EVENT:THREAD
+  ! (TakeEvent). Their threads must not outlive the window, so only a close requested again
+  ! at least CLOSE_FORCE_DELAY later closes while one is still running (the user's way out).
+  IF bForceClose = FALSE
+     cs.wait()
+     remaining = RECORDS(ThreadQueue)
+     IF remaining > 0
+        IF bClosePending = FALSE
+           bClosePending = TRUE
+           closePendingClock = CLOCK()
+           LOOP i = 1 TO remaining
+              GET(ThreadQueue,i)
+              DO CancelThreadSearch
+           END
+        ELSIF (CLOCK() - closePendingClock + 8640000) % 8640000 > CLOSE_FORCE_DELAY
+           bForceClose = TRUE
+        END
+     END
+     cs.release()
+     IF remaining > 0 AND bForceClose = FALSE
+        RETURN Level:Notify
+     END
+  END
   IF SciControl.GetModify() AND szTitle <> ''
      DO Handle_FileModified
   END
@@ -2957,6 +3022,13 @@ MenuSelection        CSTRING(32)
 szSelection          CSTRING(261)
 targetLine           LONG
 scrollDelta          LONG
+finishedTab          LONG
+bCloseFinishedTab    BOOL
+remainingThreads     LONG
+finishedResults      &ResultQueueType
+holdSearch           STRING(SIZE(SearchQueue))
+holdPointer          LONG
+bFinishedTabFound    BOOL
   CODE
   
   LOOP                                                     ! This method receives all events
@@ -2975,22 +3047,50 @@ scrollDelta          LONG
 !    ds_VisibleOnDesktop()
 !  end
     IF INRANGE(EVENT(),EVENT:THREAD,EVENT:THREADLAST)
+       ! The search thread for finishedTab has ended: it no longer touches its queues.
+       finishedTab = EVENT() - EVENT:THREAD
+       bCloseFinishedTab = FALSE
+       finishedResults &= NULL
        cs.wait()
-       ThreadQueue.tabNumber = EVENT() - EVENT:THREAD
+       ThreadQueue.tabNumber = finishedTab
        GET(ThreadQueue,+ThreadQueue.tabNumber)
        IF ~ERRORCODE()
           ClockQueue.tabNumber = ThreadQueue.tabNumber
           GET(ClockQueue,ClockQueue.tabNumber)
           ClockQueue.lClock = ClockQueue.lCLock - CLOCK()
           PUT(ClockQueue)
+          IF NOT ThreadQueue.Options &= NULL
+             DISPOSE(ThreadQueue.Options)            ! the search thread is done with its START parameter
+             ThreadQueue.Options &= NULL
+          END
+          bCloseFinishedTab = ThreadQueue.bCloseTab
+          finishedResults &= ThreadQueue.Results
+          ThreadQueue.Results &= NULL
           DELETE(ThreadQueue)
-          !dbx.Debugout('ThreadQueue for tab ' & ThreadQueue.tabNumber & ' deleted in take event')
-       ELSE
-          !dbx.Debugout('ThreadQueue for tab ' & ThreadQueue.tabNumber & ' not deleted in take event [' & error() & ']')
        END
-       bDoAutoSize = TRUE
-       POST(EVENT:NewSelection,?CurrentSearch,,1)
+       remainingThreads = RECORDS(ThreadQueue)
        cs.release()
+
+       IF NOT finishedResults &= NULL
+          DO SwapInFinishedResults
+       END
+       IF bClosePending = TRUE
+          IF remainingThreads = 0
+             bForceClose = TRUE
+             POST(EVENT:CloseWindow)
+          END
+       ELSIF bCloseFinishedTab = TRUE
+          DO CloseFinishedTab
+       ELSIF finishedTab = ?CurrentSearch{PROP:ChoiceFEQ}
+          bDoAutoSize = TRUE
+          POST(EVENT:NewSelection,?CurrentSearch,,1)
+       ELSE
+          AutoSizeQueue.tabNumber = finishedTab          ! autosize when that tab is shown
+          GET(AutoSizeQueue,AutoSizeQueue.tabNumber)
+          IF ERRORCODE()
+             ADD(AutoSizeQueue,+AutoSizeQueue.tabNumber)
+          END
+       END
   
     ELSIF INRANGE(EVENT(),EVENT:PROGRESS,EVENT:PROGRESSLAST)
        feqProgress = EVENT() - EVENT:PROGRESS
@@ -3061,6 +3161,77 @@ scrollDelta          LONG
   END
   ReturnValue = Level:Fatal
   RETURN ReturnValue
+!-----------------------------------------------------------------------------
+! Puts the queue the finished thread filled into its tab and disposes the tab's
+! old queue. Works on whichever tab finished; the current SearchQueue record and
+! buffer are restored afterwards.
+SwapInFinishedResults ROUTINE
+      holdSearch = SearchQueue
+      holdPointer = POINTER(SearchQueue)
+      SearchQueue.tabNumber = finishedTab
+      GET(SearchQueue,SearchQueue.tabNumber)
+      bFinishedTabFound = CHOOSE(ERRORCODE() = 0)
+      IF bFinishedTabFound = TRUE
+         IF finishedTab = ?CurrentSearch{PROP:ChoiceFEQ}
+            ?ResultList{PROP:From} = ''
+         END
+         IF NOT SearchQueue.ResultQueue &= NULL
+            FREE(SearchQueue.ResultQueue)
+            DISPOSE(SearchQueue.ResultQueue)
+         END
+         SearchQueue.ResultQueue &= finishedResults
+         PUT(SearchQueue)
+      ELSE
+         FREE(finishedResults)                     ! the tab is gone
+         DISPOSE(finishedResults)
+         finishedResults &= NULL
+      END
+      IF INRANGE(holdPointer,1,RECORDS(SearchQueue))
+         GET(SearchQueue,holdPointer)
+      END
+      SearchQueue = holdSearch
+      IF bFinishedTabFound = TRUE
+         IF SearchQueue.tabNumber = finishedTab
+            SearchQueue.ResultQueue &= finishedResults
+         END
+         IF finishedTab = ?CurrentSearch{PROP:ChoiceFEQ}
+            ?ResultList{PROP:From} = finishedResults
+            AutoSizer.Reset(?ResultList,finishedResults)
+         END
+      END
+      finishedResults &= NULL
+   EXIT
+!-----------------------------------------------------------------------------
+! Closes finishedTab, whose close was requested while its search was running.
+CloseFinishedTab ROUTINE
+   DATA
+shownTab    LONG
+   CODE
+      shownTab = ?CurrentSearch{PROP:ChoiceFEQ}
+      IF finishedTab <> shownTab
+         PUT(SearchQueue)                          ! keep the shown tab's record before switching
+         SearchQueue.tabNumber = finishedTab
+         GET(SearchQueue,SearchQueue.tabNumber)
+         IF ERRORCODE()
+            SearchQueue.tabNumber = shownTab
+            GET(SearchQueue,SearchQueue.tabNumber)
+            EXIT
+         END
+         ?CurrentSearch{PROP:ChoiceFEQ} = finishedTab
+      END
+      DO HandleCloseTab
+      IF finishedTab = ?Search1                    ! tab 1 is reset, not closed, and a new search is posted for it:
+         PUT(SearchQueue)                          ! stay on it so that search targets tab 1
+      ELSIF finishedTab <> shownTab                ! back to the tab the user was viewing
+         SearchQueue.tabNumber = shownTab
+         GET(SearchQueue,SearchQueue.tabNumber)
+         IF NOT ERRORCODE()
+            ?CurrentSearch{PROP:ChoiceFEQ} = shownTab
+         END
+      END
+      POST(EVENT:NewSelection,?CurrentSearch)
+   EXIT
+
 
 
 ThisWindow.TakeFieldEvent PROCEDURE
@@ -3404,6 +3575,7 @@ ThisWindow.TakeNewSelection PROCEDURE
 ReturnValue          BYTE,AUTO
 
 n      LONG
+bTabSearching BOOL
 Looped BYTE
   CODE
   LOOP                                                     ! This method receives all NewSelection events
@@ -3466,6 +3638,12 @@ Looped BYTE
       
          AutoSizer.Reset(?ResultList,SearchQueue.ResultQueue)
       
+         AutoSizeQueue.tabNumber = ?CurrentSearch{PROP:ChoiceFEQ}
+         GET(AutoSizeQueue,AutoSizeQueue.tabNumber)
+         IF NOT ERRORCODE()
+            bDoAutoSize = TRUE
+            DELETE(AutoSizeQueue)
+         END
          IF glo:AutoSizeResultColumns = TRUE AND bDoAutoSize = TRUE
             AutoSizer.ResizeAll(?ResultList)
             SearchQueue.szListBoxFormat = ?ResultList{PROP:Format}
@@ -3478,7 +3656,9 @@ Looped BYTE
          cs.Wait()
          ThreadQueue.tabNumber = ?CurrentSearch{PROP:ChoiceFEQ}
          GET(ThreadQueue,+ThreadQueue.tabNumber)
-         IF NOT ERRORCODE()
+         bTabSearching = CHOOSE(ERRORCODE() = 0)
+         cs.Release()                              ! not held across the dialog below: finishing workers take cs
+         IF bTabSearching = TRUE
             !dbx.Debugout('ThreadQueue for tab ' & ThreadQueue.tabNumber & ' found in take new selection')
             ShowWaitCursor = TRUE
             SETCURSOR(CURSOR:Wait)
@@ -3539,7 +3719,6 @@ Looped BYTE
             END
          END
          PUT(SearchQueue)
-         cs.Release()
       
          DO HandleNewSelection
          DISPLAY()
@@ -3730,6 +3909,8 @@ buttonPressed        LONG
              Window{PROP:Timer} = 0
              DO RefreshEditPane
           END
+       ELSIF NOT EditPaneRefreshPending
+          Window{PROP:Timer} = 0                    ! focus is elsewhere and nothing is pending: stop the 20 Hz navigation timer
        END
     OF EVENT:CreateRestorePoint
        DO CreateRestorePoint

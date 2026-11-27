@@ -2,6 +2,13 @@
 
    MEMBER('KSSOpen.clw')                                       ! This is a MEMBER module
 
+   MAP
+     MODULE('kernel32')
+       kll_GetModuleFileName(LONG hModule, *CSTRING lpFilename, LONG nSize),LONG,PASCAL,RAW,NAME('GetModuleFileNameA')
+     END
+     KssExeFolder(),STRING                                     ! folder of KSSOpen.exe, without trailing '\'
+   END
+
 !region Notices
 ! ================================================================================
 ! Notice : Copyright (C) 2017, Devuna
@@ -71,6 +78,10 @@ oHH           &tagHTMLHelp
   OPEN(A_A,ReadOnly+DenyWrite)
   IF ERRORCODE()
      szAAFilename = lexer & '.properties'
+     OPEN(A_A,ReadOnly+DenyWrite)
+  END
+  IF ERRORCODE()                                               ! next to the exe (e.g. Run from the IDE, where the current folder is the project)
+     szAAFilename = KssExeFolder() & '\' & lexer & '.properties'
      OPEN(A_A,ReadOnly+DenyWrite)
   END
   IF ~ERRORCODE()
@@ -341,6 +352,10 @@ oHH           &tagHTMLHelp
      szAAFilename = szPropertyFile & '.properties'
      OPEN(A_A,ReadOnly+DenyWrite)
   END
+  IF ERRORCODE()                                               ! next to the exe (e.g. Run from the IDE, where the current folder is the project)
+     szAAFilename = KssExeFolder() & '\' & szPropertyFile & '.properties'
+     OPEN(A_A,ReadOnly+DenyWrite)
+  END
   IF ~ERRORCODE()
      SET(A_A)
      NEXT(A_A)
@@ -364,3 +379,19 @@ oHH           &tagHTMLHelp
      END
   END
   RETURN szLexer
+
+!-----------------------------------------------------------------------------
+! Folder that KSSOpen.exe was started from, without the trailing backslash.
+KssExeFolder         PROCEDURE()
+szPath                 CSTRING(261)
+i                      LONG
+  CODE
+  IF kll_GetModuleFileName(0, szPath, SIZE(szPath)) = 0
+     RETURN ''
+  END
+  LOOP i = LEN(szPath) TO 1 BY -1
+     IF szPath[i] = '\'
+        RETURN szPath[1 : i - 1]
+     END
+  END
+  RETURN ''
