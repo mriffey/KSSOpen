@@ -51,6 +51,8 @@ oHH           &tagHTMLHelp
 !szCmdline   CSTRING('findstr /s /i /n /p "keystone" "*.inc *.clw"')
 siStartInfo LIKE(STARTUPINFOTYPE)
 bSuccess    BOOL(FALSE)
+errCode     LONG
+errMsg      CSTRING(512)
 
   CODE
     
@@ -89,6 +91,13 @@ bSuccess    BOOL(FALSE)
          !kcr_CloseHandle(piProcInfo.hProcess)
          kcr_CloseHandle(piProcInfo.hThread)
       ELSE
-         !MESSAGE('CreateProcess')
+         !findstr never started: say why instead of returning an empty result list
+         errCode = kcr_GetLastError()
+         errMsg = ''
+         IF kcr_FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, 0, errCode, 0, errMsg, SIZE(errMsg), 0) = 0
+            errMsg = 'Windows error ' & errCode
+         END
+         MESSAGE('KSS could not start findstr.||' & CLIP(errMsg) & '||Command line:|' & SUB(szCmdLine,1,512), |
+                 'Search failed', ICON:Exclamation)
       END
       RETURN
