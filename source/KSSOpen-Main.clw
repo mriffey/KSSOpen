@@ -214,6 +214,7 @@ closePendingClock       LONG
 LexerCacheLexer         LONG(-1)                           ! lexer and property file last loaded by SetLexerType
 LexerCacheFile          CSTRING(256)
 bLexerCacheValid        BOOL(FALSE)                        ! cleared by SetDefaultStyles and every other properties load
+bPropertiesLoaded       BOOL(FALSE)                        ! the last SetLexer loaded its property file
 CLOSE_FORCE_DELAY       EQUATE(500)                        ! 1/100 s before a repeated close request closes despite running searches
 FocusPosition           LONG
 FoldMarginClicked       BOOL
@@ -4696,7 +4697,7 @@ szLexer        CSTRING(33)
            SELF.SetLexer(FileExtensionQueue.nLexer,FileExtensionQueue.FileMode)
            LexerCacheLexer = FileExtensionQueue.nLexer
            LexerCacheFile = FileExtensionQueue.FileMode
-           bLexerCacheValid = CHOOSE(SELF.GetLexer() = FileExtensionQueue.nLexer AND SearchQueue.szPropertyFile = FileExtensionQueue.FileMode)   ! not when the load failed and fell back to text
+           bLexerCacheValid = CHOOSE(bPropertiesLoaded = TRUE AND SELF.GetLexer() = FileExtensionQueue.nLexer AND SearchQueue.szPropertyFile = FileExtensionQueue.FileMode)   ! not when the load failed and fell back to text
         END
         BREAK
      ELSE
@@ -4728,7 +4729,7 @@ szLexer        CSTRING(33)
         SELF.SetLexer(nLexer,glo:szDefaultPropertyFile)   ! was SetLexer(defaultLexer,...): the lexer name, which is not a lexer number
         LexerCacheLexer = nLexer
         LexerCacheFile = glo:szDefaultPropertyFile
-        bLexerCacheValid = CHOOSE(SELF.GetLexer() = nLexer AND SearchQueue.szPropertyFile = glo:szDefaultPropertyFile)
+        bLexerCacheValid = CHOOSE(bPropertiesLoaded = TRUE AND SELF.GetLexer() = nLexer AND SearchQueue.szPropertyFile = glo:szDefaultPropertyFile)
      END
      FileExtensionQueue.FileMode = glo:szDefaultPropertyFile
   END
@@ -5731,17 +5732,20 @@ szPropertyValue      CSTRING(256)
 
   CODE
       bLexerCacheValid = FALSE                     ! SetLexerType sets it again after its own load
+      bPropertiesLoaded = FALSE
       IF SELF.GetLexer() <> Lexer
          SELF.SetLexer(Lexer)
          SearchQueue.szPropertyFile = PropertyFile
          IF LoadLexerProperties(SELF,PropertyFile)
             SELF.SetTextLexer()
          ELSE
+            bPropertiesLoaded = TRUE
             SELF.Colourise(0,-1)
          END
       ELSE
          SearchQueue.szPropertyFile = PropertyFile
          IF NOT LoadLexerProperties(SELF,PropertyFile)
+            bPropertiesLoaded = TRUE
             SELF.Colourise(0,-1)
          END
       END
