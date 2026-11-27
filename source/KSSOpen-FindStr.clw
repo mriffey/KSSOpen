@@ -249,53 +249,15 @@ szBackslashes        CSTRING(512)
          END
       END
 
-      !setup exclusions for use with MASK procedure
-      j = LEN(FindStrOptions.szExcludeMask)
-      k = 1
+      !setup exclusions: plain wildcard masks separated by spaces,
+      !matched against the file name (or the full path when a mask has a '\') in FillResultQueue
+      szFixedExcludeMask = UPPER(CLIP(LEFT(FindStrOptions.szExcludeMask)))
+      j = LEN(szFixedExcludeMask)
       LOOP i = 1 TO j
-         CASE FindStrOptions.szExcludeMask[i]
-           OF ';' OROF '|'
-              szFixedExcludeMask[k] = ' '
-              k += 1
-           OF '*'
-              IF k = 1 OR szFixedExcludeMask[k-1] = ' '
-                 szFixedExcludeMask[k] = '^'
-                 k += 1
-                 szFixedExcludeMask[k] = '.'
-                 k += 1
-                 szFixedExcludeMask[k] = '*'
-                 k += 1
-              ELSIF i < j
-                 CASE FindStrOptions.szExcludeMask[i+1]
-                   OF ' ' OROF ';' OROF '|'
-                      szFixedExcludeMask[k] = '.'
-                      k += 1
-                      szFixedExcludeMask[k] = '*'
-                      k += 1
-                      szFixedExcludeMask[k] = '$'
-                      k += 1
-                 ELSE
-                    IF FindStrOptions.szExcludeMask[i-1] <> '.' 
-                       szFixedExcludeMask[k] = '.'
-                       k += 1
-                    END 
-                    szFixedExcludeMask[k] = '*'
-                    k += 1
-                 END
-              ELSE
-                 szFixedExcludeMask[k] = '.'
-                 k += 1
-                 szFixedExcludeMask[k] = '*'
-                 k += 1
-                 szFixedExcludeMask[k] = '$'
-                 k += 1
-              END
-         ELSE
-            szFixedExcludeMask[k] = UPPER(FindStrOptions.szExcludeMask[i])
-            k += 1
+         IF szFixedExcludeMask[i] = ';' OR szFixedExcludeMask[i] = '|'
+            szFixedExcludeMask[i] = ' '
          END
       END
-      szFixedExcludeMask[k] = '<0>'
 
 
       IF NOT FindStrOptions.bUseRegularExpressions
