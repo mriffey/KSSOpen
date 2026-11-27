@@ -211,6 +211,7 @@ tabNumber                 LONG
 bClosePending           BOOL(FALSE)                        ! close requested while searches were running
 bForceClose             BOOL(FALSE)                        ! close now, even if searches are still running
 closePendingClock       LONG
+CLOSE_FORCE_DELAY       EQUATE(500)                        ! 1/100 s before a repeated close request closes despite running searches
 FocusPosition           LONG
 FoldMarginClicked       BOOL
 bShowEvalMessage        BOOL(FALSE)
@@ -736,22 +737,7 @@ thisProcInfo         &PROCESS_INFORMATION
       GET(SearchQueue,SearchQueue.tabNumber)
       IF ~ERRORCODE()
          p = POINTER(SearchQueue)
-
-         cs.wait()
-         j = RECORDS(ThreadQueue)
-         LOOP i = 1 TO j
-            GET(ThreadQueue,i)
-            IF ThreadQueue.tabNumber = SearchQueue.tabNumber
-               thisProcInfo &= (INSTANCE(piProcInfo,ThreadQueue.ID))
-               IF NOT thisProcInfo &= NULL
-                  kcr_TerminateProcess(thisProcInfo.hProcess,0)
-               END
-               POST(EVENT:CloseWindow,,ThreadQueue.ID)
-               !YIELD()
-            END
-         END
-         cs.release()
-         YIELD()
+         ! no search thread runs for this tab here: HandleCloseTab defers the close until it has finished
 
          ?ResultList{PROP:From} = ''
 
@@ -2538,6 +2524,7 @@ Looped BYTE
        GET(ThreadQueue,+ThreadQueue.tabNumber)
        IF NOT ERRORCODE()
           cs.release()
+          redoSearch = FALSE                       ! F5/Redo set it before posting; it is not consumed here
           BEEP
           RETURN ReturnValue
        END
@@ -2991,22 +2978,26 @@ i                    LONG
 remaining            LONG
 
   CODE
-  ! Searches still running: cancel them and close when the last one has posted
-  ! EVENT:THREAD (TakeEvent), or after 5 seconds (EVENT:Timer).
+  ! Searches still running: cancel them and close when the last one has posted EVENT:THREAD
+  ! (TakeEvent). Their threads must not outlive the window, so only a close requested again
+  ! at least CLOSE_FORCE_DELAY later closes while one is still running (the user's way out).
   IF bForceClose = FALSE
      cs.wait()
      remaining = RECORDS(ThreadQueue)
-     IF remaining > 0 AND bClosePending = FALSE
-        bClosePending = TRUE
-        closePendingClock = CLOCK()
-        LOOP i = 1 TO remaining
-           GET(ThreadQueue,i)
-           DO CancelThreadSearch
+     IF remaining > 0
+        IF bClosePending = FALSE
+           bClosePending = TRUE
+           closePendingClock = CLOCK()
+           LOOP i = 1 TO remaining
+              GET(ThreadQueue,i)
+              DO CancelThreadSearch
+           END
+        ELSIF (CLOCK() - closePendingClock + 8640000) % 8640000 > CLOSE_FORCE_DELAY
+           bForceClose = TRUE
         END
      END
      cs.release()
-     IF remaining > 0
-        Window{PROP:Timer} = 50
+     IF remaining > 0 AND bForceClose = FALSE
         RETURN Level:Notify
      END
   END
@@ -3097,7 +3088,7 @@ bFinishedTabFound    BOOL
           AutoSizeQueue.tabNumber = finishedTab          ! autosize when that tab is shown
           GET(AutoSizeQueue,AutoSizeQueue.tabNumber)
           IF ERRORCODE()
-             ADD(AutoSizeQueue)
+             ADD(AutoSizeQueue,+AutoSizeQueue.tabNumber)
           END
        END
   
@@ -3213,13 +3204,29 @@ SwapInFinishedResults ROUTINE
 !-----------------------------------------------------------------------------
 ! Closes finishedTab, whose close was requested while its search was running.
 CloseFinishedTab ROUTINE
-      IF finishedTab <> ?CurrentSearch{PROP:ChoiceFEQ}
+   DATA
+shownTab    LONG
+   CODE
+      shownTab = ?CurrentSearch{PROP:ChoiceFEQ}
+      IF finishedTab <> shownTab
+         PUT(SearchQueue)                          ! keep the shown tab's record before switching
          SearchQueue.tabNumber = finishedTab
          GET(SearchQueue,SearchQueue.tabNumber)
-         IF ERRORCODE() THEN EXIT.
+         IF ERRORCODE()
+            SearchQueue.tabNumber = shownTab
+            GET(SearchQueue,SearchQueue.tabNumber)
+            EXIT
+         END
          ?CurrentSearch{PROP:ChoiceFEQ} = finishedTab
       END
       DO HandleCloseTab
+      IF finishedTab <> shownTab                   ! back to the tab the user was viewing
+         SearchQueue.tabNumber = shownTab
+         GET(SearchQueue,SearchQueue.tabNumber)
+         IF NOT ERRORCODE()
+            ?CurrentSearch{PROP:ChoiceFEQ} = shownTab
+         END
+      END
       POST(EVENT:NewSelection,?CurrentSearch)
    EXIT
 
@@ -3893,12 +3900,6 @@ buttonPressed        LONG
     OF EVENT:OpenWindow
         !post(event:visibleondesktop)
     OF EVENT:Timer
-       IF bClosePending = TRUE AND bForceClose = FALSE
-          IF (CLOCK() - closePendingClock + 8640000) % 8640000 > 500
-             bForceClose = TRUE                    ! searches did not stop within 5 s: close anyway
-             POST(EVENT:CloseWindow)
-          END
-       END
        IF ListWithFocus = ?ResultList
           IF EditPaneRefreshPending AND NOT INRANGE(CLOCK(), LastNavTime, LastNavTime + 15)
              Window{PROP:Timer} = 0
@@ -3906,9 +3907,6 @@ buttonPressed        LONG
           END
        ELSIF NOT EditPaneRefreshPending
           Window{PROP:Timer} = 0                    ! focus is elsewhere and nothing is pending: stop the 20 Hz navigation timer
-       END
-       IF bClosePending = TRUE AND bForceClose = FALSE
-          Window{PROP:Timer} = 50                   ! keep checking the close timeout
        END
     OF EVENT:CreateRestorePoint
        DO CreateRestorePoint

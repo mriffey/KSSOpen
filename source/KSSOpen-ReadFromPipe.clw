@@ -54,7 +54,6 @@ thrd           LONG
 ReadFileParams LIKE(ReadFileParamsType)
 progressCalls  LONG
 bStopping      BOOL(FALSE)
-stopTicks      LONG
 
   CODE
     
@@ -72,6 +71,7 @@ stopTicks      LONG
          w{PROP:HIDE} = TRUE
          ! ReadFile uses ReadFileParams (a local here) and adds to STDOUT_Queue until it posts
          ! EVENT:User, so this loop only ends after that, or before ReadFile was started.
+         ! There is no timeout: once findstr is terminated ReadFile's read fails and it finishes.
          ACCEPT
             IF bCancelFlag = TRUE AND bStopping = FALSE
                DO StopReading
@@ -96,8 +96,7 @@ stopTicks      LONG
                  BREAK                                         ! ReadFile has finished
               OF EVENT:Timer
                  IF bStopping = TRUE
-                    stopTicks += 1
-                    IF stopTicks >= 10 THEN BREAK.             ! ReadFile did not finish within 10 s
+                    kcr_TerminateProcess(piProcInfo.hProcess,0)   ! still waiting for ReadFile: make sure findstr is gone
                  ELSE
                     progressCalls += 1
                     POST(EVENT:PROGRESS+feqSearchProgress,,1,1)

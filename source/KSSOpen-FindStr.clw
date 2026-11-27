@@ -377,7 +377,7 @@ szBackslashes        CSTRING(512)
       glo:ThreadCmdLine = szCmdLine
 
       saAttr.nLength = SIZE(SECURITY_ATTRIBUTES)
-      saAttr.bInheritHandle = TRUE
+      saAttr.bInheritHandle = FALSE                        ! CreateChildProcess makes the child's ends inheritable just for its CreateProcess
       saAttr.lpSecurityDescriptor = 0
 
       ! Create a pipe for the child process's STDOUT.
@@ -445,7 +445,10 @@ szBackslashes        CSTRING(512)
       kcr_CloseHandle(g_hChildStd_IN_Wr)
       kcr_CloseHandle(g_hChildStd_OUT_Rd)
       !kcr_CloseHandle(g_hChildStd_OUT_Wr)
+      cs.Wait()                                            ! the main thread reads piProcInfo (CancelThreadSearch) under cs
       kcr_CloseHandle(piProcInfo.hProcess)
+      piProcInfo.hProcess = 0                              ! never TerminateProcess a closed (possibly reused) handle
+      cs.Release()
 
       !dbx.Debugout('Thread Event posted for tab ' & FindStrOptions.tabNumber & '  in FindStr')
       POST(EVENT:THREAD+FindStrOptions.tabNumber,,1)

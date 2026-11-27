@@ -578,6 +578,7 @@ glo:szNull           CSTRING(2)
 glo:bInstallOnExit   BOOL
 RegisteredTo         CSTRING(29)
 cs                   CriticalSection
+pipeCs               CriticalSection                       ! serializes CreateProcess while a search's pipe ends are inheritable
 CurrentSearch        LONG
 g_hChildStd_IN_Rd    HANDLE,THREAD
 g_hChildStd_IN_Wr    HANDLE,THREAD
