@@ -4696,7 +4696,7 @@ szLexer        CSTRING(33)
            SELF.SetLexer(FileExtensionQueue.nLexer,FileExtensionQueue.FileMode)
            LexerCacheLexer = FileExtensionQueue.nLexer
            LexerCacheFile = FileExtensionQueue.FileMode
-           bLexerCacheValid = CHOOSE(SELF.GetLexer() = FileExtensionQueue.nLexer)   ! not when the load failed and fell back to text
+           bLexerCacheValid = CHOOSE(SELF.GetLexer() = FileExtensionQueue.nLexer AND SearchQueue.szPropertyFile = FileExtensionQueue.FileMode)   ! not when the load failed and fell back to text
         END
         BREAK
      ELSE
@@ -4728,7 +4728,7 @@ szLexer        CSTRING(33)
         SELF.SetLexer(nLexer,glo:szDefaultPropertyFile)   ! was SetLexer(defaultLexer,...): the lexer name, which is not a lexer number
         LexerCacheLexer = nLexer
         LexerCacheFile = glo:szDefaultPropertyFile
-        bLexerCacheValid = CHOOSE(SELF.GetLexer() = nLexer)
+        bLexerCacheValid = CHOOSE(SELF.GetLexer() = nLexer AND SearchQueue.szPropertyFile = glo:szDefaultPropertyFile)
      END
      FileExtensionQueue.FileMode = glo:szDefaultPropertyFile
   END
@@ -4849,6 +4849,7 @@ szLexer              CSTRING(33)
               SELF.FoldAll()
            OF 'FoldMargin'
               SELF.FoldMargin()
+              bLexerCacheValid = FALSE                 ! the next file reloads 'fold' from its properties, as before
               IF SELF.bFoldMargin = TRUE AND SELF.GetLexer() = SCLEX_CLWNOCASE
                  FixFileFolding()                  ! not computed while the margin was off
               END

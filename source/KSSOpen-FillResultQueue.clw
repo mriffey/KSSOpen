@@ -458,7 +458,7 @@ p                    LONG
    CODE
       IF ResultQueue.SortName = thisFile
          IF RECORDS(ProcNameQueue) = 1
-            GET(ProcNameQueue,n)
+            GET(ProcNameQueue,1)                       ! was GET(ProcNameQueue,n) with n left from an earlier row
             ResultQueue.ProcedureName = ProcNameQueue.ProcedureName
          ELSE
             ! rows of a file come in line order: continue from the entry the previous row used
@@ -577,7 +577,9 @@ LastProcedureName    LIKE(ProcNameQueue.ProcedureName)
             BREAK
          ELSE
             thisLine += 1
-            IF thisLine > thisFileMaxLine THEN BREAK.     ! nothing after the last match is needed
+            ! Nothing after the last match is needed, except that ProcessFile treats a file with a single
+            ! procedure entry specially (that name for every row): read on until there is a second one.
+            IF thisLine > thisFileMaxLine AND RECORDS(ProcNameQueue) >= 2 THEN BREAK.
             ReplaceTabs(AsciiFile.Buffer)
 
             CASE UPPER(CLIP(LEFT(AsciiFile.Buffer)))
