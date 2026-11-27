@@ -3220,7 +3220,9 @@ shownTab    LONG
          ?CurrentSearch{PROP:ChoiceFEQ} = finishedTab
       END
       DO HandleCloseTab
-      IF finishedTab <> shownTab                   ! back to the tab the user was viewing
+      IF finishedTab = ?Search1                    ! tab 1 is reset, not closed, and a new search is posted for it:
+         PUT(SearchQueue)                          ! stay on it so that search targets tab 1
+      ELSIF finishedTab <> shownTab                ! back to the tab the user was viewing
          SearchQueue.tabNumber = shownTab
          GET(SearchQueue,SearchQueue.tabNumber)
          IF NOT ERRORCODE()
@@ -3573,6 +3575,7 @@ ThisWindow.TakeNewSelection PROCEDURE
 ReturnValue          BYTE,AUTO
 
 n      LONG
+bTabSearching BOOL
 Looped BYTE
   CODE
   LOOP                                                     ! This method receives all NewSelection events
@@ -3653,7 +3656,9 @@ Looped BYTE
          cs.Wait()
          ThreadQueue.tabNumber = ?CurrentSearch{PROP:ChoiceFEQ}
          GET(ThreadQueue,+ThreadQueue.tabNumber)
-         IF NOT ERRORCODE()
+         bTabSearching = CHOOSE(ERRORCODE() = 0)
+         cs.Release()                              ! not held across the dialog below: finishing workers take cs
+         IF bTabSearching = TRUE
             !dbx.Debugout('ThreadQueue for tab ' & ThreadQueue.tabNumber & ' found in take new selection')
             ShowWaitCursor = TRUE
             SETCURSOR(CURSOR:Wait)
@@ -3714,7 +3719,6 @@ Looped BYTE
             END
          END
          PUT(SearchQueue)
-         cs.Release()
       
          DO HandleNewSelection
          DISPLAY()
