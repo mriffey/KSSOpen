@@ -98,7 +98,7 @@ szDirectoryName      CSTRING(FILE:MAXFILENAME+1)
        DIRECTORY(DirectoryQueue, pCurrentPath & '\*.*', ff_:DIRECTORY)
        LOOP i = 1 TO RECORDS(DirectoryQueue)
           GET(DirectoryQueue,i)
-          IF BOR(DirectoryQueue.Attrib,ff_:DIRECTORY)
+          IF BAND(DirectoryQueue.Attrib,ff_:DIRECTORY)
              CASE CLIP(DirectoryQueue.Name)
                OF '.' OROF '..'
              ELSE

@@ -64,6 +64,9 @@ j              LONG
 n              LONG
 p              LONG
 x              LONG
+thisFileMaxLine LONG             !last matching line in thisFile: ProcessClarionFile stops reading after it
+lastCheckedFile CSTRING(261)     !file whose comment style / extension check is in CommentStyle / bProcessThisFile
+bProcessThisFile BOOL
 
 !ProcNameQueue  QUEUE,PRE(PNQ)
 !LineNo            LONG
@@ -86,7 +89,11 @@ modulo         LONG
 CommentStyle   LONG
 excludeQueue   QUEUE,PRE(exq)
 excludemask       CSTRING(256)
+bFullPath         BOOL           !mask contains '\': match the full path, else the file name only
                END
+excludeName    CSTRING(1025)     !folder & file name of the current findstr line
+lastExcludeName CSTRING(1025)    !file name tested last; findstr lists a file's lines together
+bExcluded      BOOL(FALSE)       !result for lastExcludeName
 
 
   CODE
@@ -96,20 +103,27 @@ excludemask       CSTRING(256)
 
    IF szFixedExcludeMask <> ''
       i = 1
-      j = INSTRING(' ',szFixedExcludeMask)
-      LOOP WHILE j
-         excludeQueue.excludemask = szFixedExcludeMask[i : j-1]
-         ADD(excludeQueue)
-         i = j+1
-         j = INSTRING(' ',szFixedExcludeMask,1,i)
+      j = LEN(szFixedExcludeMask)
+      LOOP WHILE i <= j
+         p = INSTRING(' ',szFixedExcludeMask,1,i)
+         IF p = 0
+            p = j + 1
+         END
+         IF p > i
+            excludeQueue.excludemask = szFixedExcludeMask[i : p-1]
+            excludeQueue.bFullPath = CHOOSE(INSTRING('\',excludeQueue.excludemask,1,1) > 0, TRUE, FALSE)
+            ADD(excludeQueue)
+         END
+         i = p + 1
       END
-      excludeQueue.excludemask = szFixedExcludeMask[i : LEN(szFixedExcludeMask)]
-      ADD(excludeQueue)
    END
 
    FREE(ResultQueue)
+   glo:bResultsCapped = FALSE
    j = RECORDS(STDOUT_Queue)
    LOOP i = 1 TO j
+      IF bCancelFlag = TRUE THEN BREAK.                  ! cancelled: keep the rows parsed so far
+      IF glo:bResultsCapped = TRUE THEN BREAK.           ! stopped at glo:MaxResults matches
       GET(STDOUT_Queue,i)
       sizeNeeded = LEN(thisBuffer) + LEN(STDOUT_Queue.Buffer) + 1
       IF sizeNeeded > SIZE(thisBuffer)
@@ -142,6 +156,8 @@ excludemask       CSTRING(256)
    DISPOSE(thisBuffer)
    thisBuffer &= NULL
 
+   SORT(ResultQueue,+ResultQueue.SortName,+ResultQueue.LineNo)   ! one sort instead of a keyed ADD per line; the pass below needs file order
+
    thisFile = ''
    j = RECORDS(ResultQueue)
 
@@ -154,17 +170,22 @@ excludemask       CSTRING(256)
       ELSE
          GET(ResultQueue,i)
          IF ResultQueue.szExtension
-            CommentStyle = GetCommentStyle(ResultQueue.szExtension)
-            IF glo:bAllExtensions = TRUE
-               DO ProcessFile
-            ELSE
-               LOOP p = 1 TO RECORDS(ClarionExtensionsQueue)
-                  GET(ClarionExtensionsQueue,p)
-                  IF INSTRING(ClarionExtensionsQueue.FileExtension,UPPER(ResultQueue.Filename & ResultQueue.szExtension),1)
-                     DO ProcessFile
-                     BREAK
+            IF ResultQueue.SortName <> lastCheckedFile    ! rows are sorted by file: check each file once
+               lastCheckedFile = ResultQueue.SortName
+               CommentStyle = GetCommentStyle(ResultQueue.szExtension)
+               bProcessThisFile = glo:bAllExtensions
+               IF bProcessThisFile = FALSE
+                  LOOP p = 1 TO RECORDS(ClarionExtensionsQueue)
+                     GET(ClarionExtensionsQueue,p)
+                     IF INSTRING(ClarionExtensionsQueue.FileExtension,UPPER(ResultQueue.Filename & ResultQueue.szExtension),1)
+                        bProcessThisFile = TRUE
+                        BREAK
+                     END
                   END
                END
+            END
+            IF bProcessThisFile = TRUE
+               DO ProcessFile
             END
          END
          IF modulo > 0
@@ -172,11 +193,9 @@ excludemask       CSTRING(256)
                POST(EVENT:PROGRESS+feqSearchProgress,,1)
             END
          END
-         YIELD()
+         IF i % 256 = 0 THEN YIELD().
       END
    END
-
-   SORT(ResultQueue,+ResultQueue.SortName,+ResultQueue.LineNo)
 
    IF NOT thisBuffer &= NULL
       !ASSERT(0,eqDBG & 'DISPOSE thisBuffer [' & ADDRESS(thisBuffer) & ']')
@@ -211,7 +230,19 @@ currentPath    LIKE(ResultQueue.Path)
          END
          !ASSERT(0,eqDBG & 'Thread ' & thread() & ' look for delimiter ' & thisString)
          IF bFileListFromFile = TRUE
-            DO ProcessThisString
+            IF RECORDS(excludeQueue)
+               !absolute path here: the file name ends at the first ':' after the drive colon
+               p = INSTRING(':',thisString,1,3)
+               IF p > 1
+                  excludeName = thisString[1 : p-1]
+               ELSE
+                  excludeName = thisString
+               END
+               DO CheckExcluded
+            END
+            IF NOT bExcluded
+               DO ProcessThisString
+            END
          ELSE
             IF thisString[1 : 2] = '  '
                thisFolder = CLIP(LEFT(thisString))
@@ -246,15 +277,23 @@ currentPath    LIKE(ResultQueue.Path)
 !                  thisString = thisFolder & thisString
 !               END
                !!!EndRegion
-               thisString = thisFolder & thisString
-
-               LOOP n = 1 TO RECORDS(excludeQueue)
-                  GET(excludeQueue,n)
-                  IF MATCH(UPPER(thisString),excludeQueue.excludemask,Match:Regular)
-                     BREAK
+               IF RECORDS(excludeQueue)
+                  !the file name is the text before the first ':' (file:line:text, or just file with /m)
+                  p = INSTRING(':',thisString,1,1)
+                  IF p > 1
+                     excludeName = thisString[1 : p-1]
+                  ELSE
+                     excludeName = thisString
                   END
+                  IF NUMERIC(excludeName) AND NOT INSTRING('/s',glo:ThreadCmdLine,1)
+                     excludeName = szFixedFileMask          !one file searched: findstr leaves out its name (as in ProcessThisString)
+                  END
+                  excludeName = thisFolder & excludeName
+                  DO CheckExcluded
                END
-               IF n > RECORDS(excludeQueue)
+
+               thisString = thisFolder & thisString
+               IF NOT bExcluded
                   DO ProcessThisString
                END
 
@@ -269,6 +308,39 @@ currentPath    LIKE(ResultQueue.Path)
             thisBuffer = thisBuffer[i : LEN(thisBuffer)]
          ELSE
             thisBuffer = ''
+         END
+      END
+
+CheckExcluded        ROUTINE
+      IF excludeName <> lastExcludeName
+         lastExcludeName = excludeName
+         DO TestExcludeMasks
+      END
+
+TestExcludeMasks     ROUTINE
+   DATA
+n2             LONG
+p2             LONG
+excludeFile    CSTRING(1025)
+
+   CODE
+      excludeFile = excludeName
+      LOOP p2 = LEN(excludeName) TO 1 BY -1
+         IF excludeName[p2] = '\'
+            excludeFile = excludeName[p2+1 : LEN(excludeName)]
+            BREAK
+         END
+      END
+      bExcluded = FALSE
+      LOOP n2 = 1 TO RECORDS(excludeQueue)
+         GET(excludeQueue,n2)
+         IF excludeQueue.bFullPath
+            bExcluded = MATCH(excludeName,excludeQueue.excludemask,Match:Wild+Match:NoCase)
+         ELSE
+            bExcluded = MATCH(excludeFile,excludeQueue.excludemask,Match:Wild+Match:NoCase)
+         END
+         IF bExcluded
+            BREAK
          END
       END
 
@@ -308,7 +380,7 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                ResultQueue.Filename = szName
                ResultQueue.szExtension = szExtension
 
-               IF NOT INSTRING('/s',glo:findstrCommandLine,1)
+               IF NOT INSTRING('/s',glo:ThreadCmdLine,1)
                   IF NUMERIC(szName) AND szExtension = ''
                      pDot = INSTRING('.',szFixedFileMask)
                      szName = szFixedFileMask[1 : pDot-1]
@@ -347,7 +419,11 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                   ResultQueue.FileDate = currentFileDate
                   ResultQueue.FileTime = currentFileTime
 
-                  ADD(ResultQueue,+ResultQueue.SortName,+ResultQueue.LineNo)
+                  IF glo:bCapRawRows = TRUE AND glo:MaxResults > 0 AND RECORDS(ResultQueue) >= glo:MaxResults
+                     glo:bResultsCapped = TRUE                 ! keep memory bounded on huge result sets
+                  ELSE
+                     ADD(ResultQueue)                          ! sorted once after the output is read
+                  END
                END
             ELSIF bFilenamesOnly
                szPath = thisString
@@ -378,7 +454,11 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                ResultQueue.FileDate = currentFileDate
                ResultQueue.FileTime = currentFileTime
 
-               ADD(ResultQueue,+ResultQueue.SortName,+ResultQueue.LineNo)
+               IF glo:bCapRawRows = TRUE AND glo:MaxResults > 0 AND RECORDS(ResultQueue) >= glo:MaxResults
+                  glo:bResultsCapped = TRUE
+               ELSE
+                  ADD(ResultQueue)                             ! sorted once after the output is read
+               END
             END
 
 ProcessFile    ROUTINE
@@ -388,10 +468,11 @@ p                    LONG
    CODE
       IF ResultQueue.SortName = thisFile
          IF RECORDS(ProcNameQueue) = 1
-            GET(ProcNameQueue,n)
+            GET(ProcNameQueue,1)                       ! was GET(ProcNameQueue,n) with n left from an earlier row
             ResultQueue.ProcedureName = ProcNameQueue.ProcedureName
          ELSE
-            LOOP n = 1 TO RECORDS(ProcNameQueue)
+            ! rows of a file come in line order: continue from the entry the previous row used
+            LOOP n = CHOOSE(n > 1, n - 1, 1) TO RECORDS(ProcNameQueue)
                GET(ProcNameQueue,n)
                IF ProcNameQueue.LineNo <= ResultQueue.LineNo
                   ResultQueue.ProcedureName = ProcNameQueue.ProcedureName
@@ -417,6 +498,14 @@ p                    LONG
          FREE(ProcNameQueue)
          FREE(SectionQueue)
          thisLine = 0
+         thisFileMaxLine = ResultQueue.LineNo          ! rows are sorted by file and line: find this file's last one
+         x = POINTER(ResultQueue)
+         LOOP p = x + 1 TO RECORDS(ResultQueue)
+            GET(ResultQueue,p)
+            IF ResultQueue.SortName <> thisFile THEN BREAK.
+            thisFileMaxLine = ResultQueue.LineNo
+         END
+         GET(ResultQueue,x)
          AsciiFilename = thisFile
          OPEN(AsciiFile,ReadOnly+DenyWrite)
          IF ~ERRORCODE()
@@ -497,8 +586,11 @@ LastProcedureName    LIKE(ProcNameQueue.ProcedureName)
          IF ERRORCODE()
             BREAK
          ELSE
-            ReplaceTabs(AsciiFile.Buffer)
             thisLine += 1
+            ! Nothing after the last match is needed, except that ProcessFile treats a file with a single
+            ! procedure entry specially (that name for every row): read on until there is a second one.
+            IF thisLine > thisFileMaxLine AND RECORDS(ProcNameQueue) >= 2 THEN BREAK.
+            ReplaceTabs(AsciiFile.Buffer)
 
             CASE UPPER(CLIP(LEFT(AsciiFile.Buffer)))
               OF 'DATA'
