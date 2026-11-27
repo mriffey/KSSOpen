@@ -424,7 +424,7 @@ szBackslashes        CSTRING(512)
                         IF NOT MatchWithoutComment(ResultQueue.Text,szMatchPattern,bMatchMode,ResultQueue.szExtension)
                            DELETE(ResultQueue)
                         END
-                        YIELD()
+                        IF i % 256 = 0 THEN YIELD().
                      END
                   END
 

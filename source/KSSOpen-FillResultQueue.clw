@@ -64,6 +64,9 @@ j              LONG
 n              LONG
 p              LONG
 x              LONG
+thisFileMaxLine LONG             !last matching line in thisFile: ProcessClarionFile stops reading after it
+lastCheckedFile CSTRING(261)     !file whose comment style / extension check is in CommentStyle / bProcessThisFile
+bProcessThisFile BOOL
 
 !ProcNameQueue  QUEUE,PRE(PNQ)
 !LineNo            LONG
@@ -165,17 +168,22 @@ bExcluded      BOOL(FALSE)       !result for lastExcludeName
       ELSE
          GET(ResultQueue,i)
          IF ResultQueue.szExtension
-            CommentStyle = GetCommentStyle(ResultQueue.szExtension)
-            IF glo:bAllExtensions = TRUE
-               DO ProcessFile
-            ELSE
-               LOOP p = 1 TO RECORDS(ClarionExtensionsQueue)
-                  GET(ClarionExtensionsQueue,p)
-                  IF INSTRING(ClarionExtensionsQueue.FileExtension,UPPER(ResultQueue.Filename & ResultQueue.szExtension),1)
-                     DO ProcessFile
-                     BREAK
+            IF ResultQueue.SortName <> lastCheckedFile    ! rows are sorted by file: check each file once
+               lastCheckedFile = ResultQueue.SortName
+               CommentStyle = GetCommentStyle(ResultQueue.szExtension)
+               bProcessThisFile = glo:bAllExtensions
+               IF bProcessThisFile = FALSE
+                  LOOP p = 1 TO RECORDS(ClarionExtensionsQueue)
+                     GET(ClarionExtensionsQueue,p)
+                     IF INSTRING(ClarionExtensionsQueue.FileExtension,UPPER(ResultQueue.Filename & ResultQueue.szExtension),1)
+                        bProcessThisFile = TRUE
+                        BREAK
+                     END
                   END
                END
+            END
+            IF bProcessThisFile = TRUE
+               DO ProcessFile
             END
          END
          IF modulo > 0
@@ -183,7 +191,7 @@ bExcluded      BOOL(FALSE)       !result for lastExcludeName
                POST(EVENT:PROGRESS+feqSearchProgress,,1)
             END
          END
-         YIELD()
+         IF i % 256 = 0 THEN YIELD().
       END
    END
 
@@ -453,7 +461,8 @@ p                    LONG
             GET(ProcNameQueue,n)
             ResultQueue.ProcedureName = ProcNameQueue.ProcedureName
          ELSE
-            LOOP n = 1 TO RECORDS(ProcNameQueue)
+            ! rows of a file come in line order: continue from the entry the previous row used
+            LOOP n = CHOOSE(n > 1, n - 1, 1) TO RECORDS(ProcNameQueue)
                GET(ProcNameQueue,n)
                IF ProcNameQueue.LineNo <= ResultQueue.LineNo
                   ResultQueue.ProcedureName = ProcNameQueue.ProcedureName
@@ -479,6 +488,14 @@ p                    LONG
          FREE(ProcNameQueue)
          FREE(SectionQueue)
          thisLine = 0
+         thisFileMaxLine = ResultQueue.LineNo          ! rows are sorted by file and line: find this file's last one
+         x = POINTER(ResultQueue)
+         LOOP p = x + 1 TO RECORDS(ResultQueue)
+            GET(ResultQueue,p)
+            IF ResultQueue.SortName <> thisFile THEN BREAK.
+            thisFileMaxLine = ResultQueue.LineNo
+         END
+         GET(ResultQueue,x)
          AsciiFilename = thisFile
          OPEN(AsciiFile,ReadOnly+DenyWrite)
          IF ~ERRORCODE()
@@ -559,8 +576,9 @@ LastProcedureName    LIKE(ProcNameQueue.ProcedureName)
          IF ERRORCODE()
             BREAK
          ELSE
-            ReplaceTabs(AsciiFile.Buffer)
             thisLine += 1
+            IF thisLine > thisFileMaxLine THEN BREAK.     ! nothing after the last match is needed
+            ReplaceTabs(AsciiFile.Buffer)
 
             CASE UPPER(CLIP(LEFT(AsciiFile.Buffer)))
               OF 'DATA'
