@@ -585,7 +585,7 @@ g_hChildStd_OUT_Rd   HANDLE,THREAD
 g_hChildStd_OUT_Wr   HANDLE,THREAD
 piProcInfo           LIKE(PROCESS_INFORMATION),THREAD
 CancelFlag           BYTE,THREAD
-glo:findstrCommandLine CSTRING(261)
+glo:findstrCommandLine CSTRING(8193)
 glo:SplitterOrientation BYTE(1)
 glo:SplitX           LONG
 glo:SplitY           LONG

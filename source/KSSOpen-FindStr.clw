@@ -79,7 +79,7 @@ OFFileName     STRING(256),NAME('name')
 oHH           &tagHTMLHelp
 saAttr               LIKE(SECURITY_ATTRIBUTES)
 SavePath             CSTRING(261)
-szCmdLine            CSTRING(261)
+szCmdLine            CSTRING(8193)                         ! CreateProcess allows up to 32767; pattern + paths can exceed 260
 ResultQueue          &ResultQueueType
 lpResultQueue        LONG
 bExcludeComments     BYTE
@@ -397,6 +397,16 @@ szBackslashes        CSTRING(512)
          END
       END
 
+      ! A CSTRING truncates silently; if the command filled the buffer, findstr would get a cut-off
+      ! pattern or path, so stop with a message instead of returning wrong results.
+      IF LEN(szCmdLine) >= SIZE(szCmdLine) - 1
+         MESSAGE('The findstr command line is too long (more than ' & SIZE(szCmdLine) - 2 & ' characters).||Use fewer search folders or a shorter pattern.','Kwik Source Search',ICON:Exclamation)
+         IF szFileListFilename <> '' THEN REMOVE(szFileListFilename).
+         IF szSearchStringFilename <> '' THEN REMOVE(szSearchStringFilename).
+         FREE(ResultQueue)
+         POST(EVENT:THREAD+FindStrOptions.tabNumber,,1)
+         RETURN
+      END
       !MESSAGE('normal command line=' & szCmdLine)
       !SETCLIPBOARD(szCmdLine) 
       glo:findstrCommandLine = szCmdLine
