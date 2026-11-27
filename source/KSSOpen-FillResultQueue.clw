@@ -118,6 +118,7 @@ bExcluded      BOOL(FALSE)       !result for lastExcludeName
    FREE(ResultQueue)
    j = RECORDS(STDOUT_Queue)
    LOOP i = 1 TO j
+      IF bCancelFlag = TRUE THEN BREAK.                  ! cancelled: keep the rows parsed so far
       GET(STDOUT_Queue,i)
       sizeNeeded = LEN(thisBuffer) + LEN(STDOUT_Queue.Buffer) + 1
       IF sizeNeeded > SIZE(thisBuffer)
@@ -149,6 +150,8 @@ bExcluded      BOOL(FALSE)       !result for lastExcludeName
    !ASSERT(0,eqDBG & 'DISPOSE thisBuffer [' & ADDRESS(thisBuffer) & ']')
    DISPOSE(thisBuffer)
    thisBuffer &= NULL
+
+   SORT(ResultQueue,+ResultQueue.SortName,+ResultQueue.LineNo)   ! one sort instead of a keyed ADD per line; the pass below needs file order
 
    thisFile = ''
    j = RECORDS(ResultQueue)
@@ -183,8 +186,6 @@ bExcluded      BOOL(FALSE)       !result for lastExcludeName
          YIELD()
       END
    END
-
-   SORT(ResultQueue,+ResultQueue.SortName,+ResultQueue.LineNo)
 
    IF NOT thisBuffer &= NULL
       !ASSERT(0,eqDBG & 'DISPOSE thisBuffer [' & ADDRESS(thisBuffer) & ']')
@@ -274,7 +275,7 @@ currentPath    LIKE(ResultQueue.Path)
                   ELSE
                      excludeName = thisString
                   END
-                  IF NUMERIC(excludeName) AND NOT INSTRING('/s',glo:findstrCommandLine,1)
+                  IF NUMERIC(excludeName) AND NOT INSTRING('/s',glo:ThreadCmdLine,1)
                      excludeName = szFixedFileMask          !one file searched: findstr leaves out its name (as in ProcessThisString)
                   END
                   excludeName = thisFolder & excludeName
@@ -369,7 +370,7 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                ResultQueue.Filename = szName
                ResultQueue.szExtension = szExtension
 
-               IF NOT INSTRING('/s',glo:findstrCommandLine,1)
+               IF NOT INSTRING('/s',glo:ThreadCmdLine,1)
                   IF NUMERIC(szName) AND szExtension = ''
                      pDot = INSTRING('.',szFixedFileMask)
                      szName = szFixedFileMask[1 : pDot-1]
@@ -408,7 +409,7 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                   ResultQueue.FileDate = currentFileDate
                   ResultQueue.FileTime = currentFileTime
 
-                  ADD(ResultQueue,+ResultQueue.SortName,+ResultQueue.LineNo)
+                  ADD(ResultQueue)                             ! sorted once after the output is read
                END
             ELSIF bFilenamesOnly
                szPath = thisString
@@ -439,7 +440,7 @@ fileQueue         QUEUE(FILE:queue),PRE(fq)
                ResultQueue.FileDate = currentFileDate
                ResultQueue.FileTime = currentFileTime
 
-               ADD(ResultQueue,+ResultQueue.SortName,+ResultQueue.LineNo)
+               ADD(ResultQueue)                                ! sorted once after the output is read
             END
 
 ProcessFile    ROUTINE

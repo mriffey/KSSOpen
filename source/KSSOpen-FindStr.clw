@@ -374,6 +374,7 @@ szBackslashes        CSTRING(512)
       !MESSAGE('normal command line=' & szCmdLine)
       !SETCLIPBOARD(szCmdLine) 
       glo:findstrCommandLine = szCmdLine
+      glo:ThreadCmdLine = szCmdLine
 
       saAttr.nLength = SIZE(SECURITY_ATTRIBUTES)
       saAttr.bInheritHandle = TRUE
@@ -414,6 +415,7 @@ szBackslashes        CSTRING(512)
 
                      j = RECORDS(ResultQueue)
                      LOOP i = j TO 1 BY -1
+                        IF CancelFlag = TRUE THEN BREAK.
                         GET(ResultQueue,i)
                         x# = 1
                         IF thisFile <> ResultQueue.Filename & ResultQueue.szExtension

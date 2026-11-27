@@ -586,6 +586,7 @@ g_hChildStd_OUT_Wr   HANDLE,THREAD
 piProcInfo           LIKE(PROCESS_INFORMATION),THREAD
 CancelFlag           BYTE,THREAD
 glo:findstrCommandLine CSTRING(8193)
+glo:ThreadCmdLine    CSTRING(8193),THREAD                  ! the search thread's own command line (glo:findstrCommandLine is shared by all tabs)
 glo:SplitterOrientation BYTE(1)
 glo:SplitX           LONG
 glo:SplitY           LONG
@@ -649,6 +650,8 @@ TargetProcessHandle    LONG
 tabNumber              LONG
 lClock                 LONG
 Options                &STRING                   ! START parameter for FindStr; disposed when the thread posts EVENT:THREAD
+Results                &ResultQueueType          ! queue the thread fills; swapped into the tab when the thread posts EVENT:THREAD
+bCloseTab              BYTE                      ! close the tab once the thread has finished
                      END
 STDOUT_Queue         QUEUE(STDOUTQueueType),PRE(SQ),THREAD
                      END
