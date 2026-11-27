@@ -576,6 +576,7 @@ SaveSearchParameters ROUTINE
    DATA
 n                 LONG
 LocationColWidth  LONG
+szIniPattern      LIKE(SearchQueue.szPattern)
 
    CODE
       INIMgr.Update('Search Options','bMatchPatternStartOfLine',SearchQueue.bMatchPatternStartOfLine)
@@ -589,9 +590,12 @@ LocationColWidth  LONG
       INIMgr.Update('Search Options','bExcludeComments',SearchQueue.bExcludeComments)
       !INIMgr.Update('Search Options','bIncludeBinary',SearchQueue.bIncludeBinary)
 
-      ReplaceChr(SearchQueue.szPattern,'''','§')
+      ! Swap ' for § only in the copy written to the INI. Changing SearchQueue.szPattern itself left the
+      ! tab's pattern with §, so the Cmt button (DeleteCommentLines) never matched patterns with an apostrophe.
+      szIniPattern = SearchQueue.szPattern
+      ReplaceChr(szIniPattern,'''','§')
       !ReplaceChr(SearchQueue.szPattern,'''','<A7h>')  ! MR 20190217 avoid losing this important hex char to random translation. 
-      INIMgr.Update('Search Options','szPattern',SearchQueue.szPattern)
+      INIMgr.Update('Search Options','szPattern',szIniPattern)
 
       INIMgr.Update('Search Options','szSearchPath',SearchQueue.szSearchPath)
       INIMgr.Update('Search Options','szFileMask',SearchQueue.szFileMask)

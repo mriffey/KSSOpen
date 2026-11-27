@@ -83,6 +83,7 @@ szCmdLine            CSTRING(8193)                         ! CreateProcess allow
 ResultQueue          &ResultQueueType
 lpResultQueue        LONG
 bExcludeComments     BYTE
+szMatchPattern       CSTRING(1025)                         ! pattern as typed, for the comment filter (szPattern is escaped for findstr)
 bMatchMode           LONG
 FindStrOptions       GROUP(FindStrOptionsGroupType)
                      END
@@ -116,6 +117,7 @@ szBackslashes        CSTRING(512)
       !ASSERT(0,eqDBG & 'Thread ' & thread() & ' started')
       FindStrOptions = strOptionsGroup
       ReplaceChr(FindStrOptions.szPattern,'§','''')
+      szMatchPattern = FindStrOptions.szPattern
       ResultQueue &= FindStrOptions.ResultQueue
 
       !szCmdline   CSTRING('findstr /s /i /n /p "keystone" "d:\program files (x86)\softvelocity\clarion8\accessory\libsrc\win\*.inc"')
@@ -455,7 +457,7 @@ szBackslashes        CSTRING(512)
                         IF thisFile <> ResultQueue.Filename & ResultQueue.szExtension
                            thisFile = ResultQueue.Filename & ResultQueue.szExtension
                         END
-                        IF NOT MatchWithoutComment(ResultQueue.Text,FindStrOptions.szPattern,bMatchMode,ResultQueue.szExtension)
+                        IF NOT MatchWithoutComment(ResultQueue.Text,szMatchPattern,bMatchMode,ResultQueue.szExtension)
                            DELETE(ResultQueue)
                         END
                         YIELD()
